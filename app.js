@@ -1,0 +1,664 @@
+/* ===== Дневник тренировок ===== */
+"use strict";
+
+const LS_KEY = "gymtracker_v1";
+
+/* --- Группы мышц: цвет и эмодзи --- */
+const GROUPS = {
+  "Грудь":  { emoji: "🛡️", color: "#fb7185" },
+  "Спина":  { emoji: "🧗", color: "#38bdf8" },
+  "Ноги":   { emoji: "🦵", color: "#a78bfa" },
+  "Плечи":  { emoji: "🏋️", color: "#fbbf24" },
+  "Руки":   { emoji: "💪", color: "#34d399" },
+  "Корпус": { emoji: "🧘", color: "#f97316" },
+  "Кардио": { emoji: "🏃", color: "#2dd4bf" },
+  "Прочее": { emoji: "⭐", color: "#94a3b8" },
+};
+const gInfo = (g) => GROUPS[g] || GROUPS["Прочее"];
+
+/* --- Темы оформления: [фон, акцент, второй цвет] --- */
+const THEMES = [
+  { id: "dark",        name: "Тёмный синий",    sw: ["#0b1120", "#38bdf8", "#6366f1"] },
+  { id: "light",       name: "Белый",           sw: ["#eef1f7", "#0ea5e9", "#ffffff"] },
+  { id: "purple",      name: "Фиолетовый",      sw: ["#17102a", "#a78bfa", "#e879f9"] },
+  { id: "orange",      name: "Оранж + чёрный",  sw: ["#120d08", "#fb923c", "#f97316"] },
+  { id: "orangelight", name: "Оранж + белый",   sw: ["#fff6ef", "#f97316", "#ffffff"] },
+  { id: "orangenavy",  name: "Оранж + синий",   sw: ["#0b1626", "#fb923c", "#38bdf8"] },
+  { id: "honey",       name: "Жёлтый + чёрный", sw: ["#0c0b06", "#facc15", "#f59e0b"] },
+  { id: "red",         name: "Белый + красный", sw: ["#faf6f6", "#ef4444", "#ffffff"] },
+  // дизайны, отличающиеся формой и шрифтом
+  { id: "minimal",     name: "⬜ Минимал",      sw: ["#fbfbfd", "#18181b", "#ffffff"] },
+  { id: "neon",        name: "🌃 Неон",         sw: ["#050507", "#4ade80", "#22d3ee"] },
+  { id: "pastel",      name: "🌸 Пастель",      sw: ["#f6f0ff", "#a78bfa", "#f0abfc"] },
+  { id: "retro",       name: "🖥️ Ретро",        sw: ["#0d0b00", "#fbbf24", "#f59e0b"] },
+];
+
+/* --- Встроенный список упражнений --- */
+const DEFAULT_EXERCISES = [
+  // Грудь
+  ["Жим штанги лёжа", "Грудь"], ["Жим штанги на наклонной", "Грудь"],
+  ["Жим гантелей лёжа", "Грудь"], ["Жим гантелей на наклонной", "Грудь"],
+  ["Жим в тренажёре", "Грудь"], ["Жим в Смите", "Грудь"],
+  ["Разводка гантелей", "Грудь"], ["Разводка в кроссовере", "Грудь"],
+  ["Бабочка (пек-дек)", "Грудь"], ["Отжимания от пола", "Грудь"],
+  ["Отжимания на брусьях", "Грудь"], ["Пуловер", "Грудь"],
+  // Спина
+  ["Подтягивания", "Спина"], ["Подтягивания широким хватом", "Спина"],
+  ["Подтягивания обратным хватом", "Спина"], ["Тяга верхнего блока", "Спина"],
+  ["Тяга горизонтального блока", "Спина"], ["Тяга штанги в наклоне", "Спина"],
+  ["Тяга гантели в наклоне", "Спина"], ["Тяга Т-грифа", "Спина"],
+  ["Становая тяга", "Спина"], ["Становая сумо", "Спина"],
+  ["Гиперэкстензия", "Спина"], ["Пуловер на блоке", "Спина"],
+  // Ноги
+  ["Приседания со штангой", "Ноги"], ["Фронтальные приседания", "Ноги"],
+  ["Гакк-присед", "Ноги"], ["Жим ногами", "Ноги"],
+  ["Выпады", "Ноги"], ["Болгарские выпады", "Ноги"],
+  ["Зашагивания на тумбу", "Ноги"], ["Румынская тяга", "Ноги"],
+  ["Разгибания ног", "Ноги"], ["Сгибания ног лёжа", "Ноги"],
+  ["Сгибания ног сидя", "Ноги"], ["Икры стоя", "Ноги"],
+  ["Икры сидя", "Ноги"], ["Ягодичный мост", "Ноги"],
+  ["Отведение ноги на блоке", "Ноги"],
+  // Плечи
+  ["Жим штанги стоя", "Плечи"], ["Жим гантелей сидя", "Плечи"],
+  ["Жим гантелей стоя", "Плечи"], ["Жим Арнольда", "Плечи"],
+  ["Махи гантелями в стороны", "Плечи"], ["Махи гантелями перед собой", "Плечи"],
+  ["Махи в наклоне", "Плечи"], ["Разводка в тренажёре", "Плечи"],
+  ["Тяга к лицу (face pull)", "Плечи"], ["Тяга к подбородку", "Плечи"],
+  ["Шраги со штангой", "Плечи"], ["Шраги с гантелями", "Плечи"],
+  // Руки
+  ["Подъём штанги на бицепс", "Руки"], ["Подъём EZ-грифа на бицепс", "Руки"],
+  ["Подъём гантелей на бицепс", "Руки"], ["Подъём на скамье Скотта", "Руки"],
+  ["Молотки", "Руки"], ["Концентрированный подъём", "Руки"],
+  ["Подъём на нижнем блоке", "Руки"], ["Французский жим лёжа", "Руки"],
+  ["Французский жим сидя", "Руки"], ["Жим узким хватом", "Руки"],
+  ["Разгибания на блоке", "Руки"], ["Разгибание из-за головы", "Руки"],
+  ["Отжимания узким хватом", "Руки"], ["Обратные отжимания от скамьи", "Руки"],
+  // Корпус
+  ["Планка", "Корпус"], ["Боковая планка", "Корпус"],
+  ["Скручивания", "Корпус"], ["Обратные скручивания", "Корпус"],
+  ["Подъём ног в висе", "Корпус"], ["Подъём ног лёжа", "Корпус"],
+  ["Велосипед", "Корпус"], ["Пресс на блоке", "Корпус"],
+  ["Русские скручивания", "Корпус"], ["Берпи", "Корпус"],
+  // Кардио
+  ["Беговая дорожка", "Кардио"], ["Эллипс", "Кардио"],
+  ["Велотренажёр", "Кардио"], ["Гребной тренажёр", "Кардио"],
+  ["Скакалка", "Кардио"], ["Степпер", "Кардио"],
+];
+
+/* --- Состояние --- */
+let state = load();
+let pickerGroup = null;
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_KEY));
+    if (s && s.exercises) {
+      // миграция старого формата draft/stretch
+      if (s.draft && Array.isArray(s.draft.stretch)) s.draft = null;
+      // подмешиваем новые встроенные упражнения
+      const have = new Set(s.exercises.map((e) => e.name));
+      DEFAULT_EXERCISES.forEach(([name, group], i) => {
+        if (!have.has(name)) s.exercises.push({ id: "d" + i + "_" + s.exercises.length, name, group, custom: false });
+      });
+      s.templates = s.templates || [];
+      return s;
+    }
+  } catch (e) { /* первая загрузка */ }
+  return {
+    exercises: DEFAULT_EXERCISES.map(([name, group], i) => ({ id: "d" + i, name, group, custom: false })),
+    workouts: [],
+    templates: [], // [{id,name,entries}]
+    draft: null, // {entries:[{exerciseId,name,group,sets:[{kg,reps,bw}]}], warmup, stretch, durH, durM, sauna:[{min,shower}]}
+  };
+}
+
+function save() {
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+
+/* --- Утилиты --- */
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmtDate = (iso) => new Date(iso).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+const fmtDur = (min) => {
+  const h = Math.floor(min / 60), m = min % 60;
+  if (!min) return "—";
+  return h ? (m ? `${h} ч ${m} мин` : `${h} ч`) : `${m} мин`;
+};
+
+/* --- Навигация по вкладкам --- */
+const TITLES = { workout: "🏋️ Зал", history: "📋 История", progress: "📈 Прогресс", exercises: "💪 Упражнения" };
+
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+    document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+    tab.classList.add("active");
+    const name = tab.dataset.screen;
+    $("screen-" + name).classList.add("active");
+    $("screenTitle").textContent = TITLES[name];
+    if (name === "history") renderHistory();
+    if (name === "progress") renderProgress();
+    if (name === "exercises") renderExercises();
+  });
+});
+
+/* ================= ТРЕНИРОВКА ================= */
+
+let showActive = false; // показывать ли экран активной тренировки
+
+$("btnStartWorkout").addEventListener("click", () => {
+  if (!state.draft) {
+    state.draft = { entries: [], durH: 1, durM: 0, sauna: [] };
+    save();
+  }
+  showActive = true;
+  renderWorkout();
+});
+
+$("btnBackWorkout").addEventListener("click", () => {
+  showActive = false; // черновик остаётся — можно продолжить позже
+  renderWorkout();
+});
+
+$("btnDiscardWorkout").addEventListener("click", () => {
+  if (!confirm("Удалить эту тренировку? Всё заполненное пропадёт.")) return;
+  state.draft = null;
+  showActive = false;
+  save();
+  renderWorkout();
+});
+
+$("btnFinishWorkout").addEventListener("click", () => {
+  const d = state.draft;
+  if (!d) return;
+  if (!d.entries.length) {
+    if (!confirm("Тренировка пустая. Завершить без записи?")) return;
+    state.draft = null; save(); renderWorkout(); return;
+  }
+  if (!confirm(d.editId ? "Сохранить изменения?" : "Завершить и сохранить тренировку?")) return;
+  const data = {
+    durationMin: (parseInt(d.durH) || 0) * 60 + (parseInt(d.durM) || 0),
+    sauna: d.sauna || [],
+    entries: d.entries,
+  };
+  if (d.editId) {
+    const w = state.workouts.find((x) => x.id === d.editId);
+    if (w) Object.assign(w, data);
+  } else {
+    state.workouts.unshift({ id: "w" + Date.now(), dateISO: new Date().toISOString(), ...data });
+  }
+  state.draft = null;
+  showActive = false;
+  save();
+  renderWorkout();
+});
+
+$("durH").addEventListener("input", (e) => { state.draft.durH = e.target.value; save(); });
+$("durM").addEventListener("input", (e) => { state.draft.durM = e.target.value; save(); });
+
+function renderWorkout() {
+  const d = state.draft;
+  const active = !!(d && showActive);
+  $("workoutIdle").classList.toggle("hidden", active);
+  $("workoutActive").classList.toggle("hidden", !active);
+  $("btnStartWorkout").textContent = d ? "Продолжить тренировку" : "Добавить тренировку";
+  $("btnDiscardWorkout").classList.toggle("hidden", !d);
+
+  // Шаблоны на стартовом экране
+  $("templates").innerHTML = state.templates.length
+    ? `<div class="pick-group">Шаблоны</div>` +
+      state.templates.map((t) => `
+        <div class="card hist-card" onclick="startFromTemplate('${t.id}')">
+          <div class="top">
+            <span class="hist-date">📄 ${esc(t.name)}</span>
+            <button class="set-del" title="Удалить шаблон" onclick="event.stopPropagation();delTemplate('${t.id}')">✕</button>
+          </div>
+          <div class="hist-ex">${t.entries.length} упр.: ${esc(t.entries.slice(0, 3).map((e) => e.name).join(", "))}${t.entries.length > 3 ? "…" : ""}</div>
+        </div>`).join("")
+    : "";
+
+  if (!active) return;
+
+  $("btnFinishWorkout").textContent = d.editId ? "💾 Сохранить изменения" : "✔ Завершить тренировку";
+  $("durH").value = d.durH;
+  $("durM").value = d.durM;
+  d.sauna = d.sauna || [];
+
+  $("saunaList").innerHTML = d.sauna.map((s, i) => `
+    <div class="set-row">
+      <span class="set-num">${i + 1}</span>
+      <div class="stepper">
+        <button class="bump" onpointerdown="startSBump(event,${i},'min',-1)" oncontextmenu="return false">−</button>
+        <input class="set-in" type="number" value="${s.min}" min="0" inputmode="numeric" onchange="setSauna(${i},'min',this.value)"><span class="unit">мин</span>
+        <button class="bump" onpointerdown="startSBump(event,${i},'min',1)" oncontextmenu="return false">+</button>
+      </div>
+      ${s.shower ? "" : `<button class="bw-mini" title="Добавить холодный душ" onclick="addShower(${i})">🚿</button>`}
+      <button class="set-del" onclick="delSauna(${i})">✕</button>
+    </div>
+    ${s.shower ? `
+    <div class="set-row sauna-sub">
+      <span class="set-num">🚿</span>
+      <span class="sub-label">холодный душ</span>
+      <button class="set-del" onclick="delShower(${i})">✕</button>
+    </div>` : ""}`).join("");
+
+  $("entries").innerHTML = d.entries.map((e, ei) => `
+    <div class="card">
+      <div class="ex-head">
+        <div>
+          <span class="ex-name">${esc(e.name)}</span>
+          <span class="ex-tag" style="background:${gInfo(e.group).color}22;color:${gInfo(e.group).color}">${esc(e.group || "")}</span>
+        </div>
+        <button class="btn-danger btn" onclick="removeEntry(${ei})">✕</button>
+      </div>
+      ${e.sets.map((s, si) => `
+        <div class="set-row">
+          <span class="set-num">${si + 1}</span>
+          ${s.bw
+            ? `<button class="bw-pill" onclick="setBw(${ei},${si},0)" title="Нажми, чтобы вернуть кг">🤸 свой вес</button>`
+            : `<div class="stepper">
+            <button class="bump" onpointerdown="startBump(event,${ei},${si},'kg',-1)" oncontextmenu="return false">−</button>
+            <input class="set-in" type="number" value="${s.kg}" min="0" step="0.5" inputmode="decimal" onchange="setVal(${ei},${si},'kg',this.value)"><span class="unit">кг</span>
+            <button class="bump" onpointerdown="startBump(event,${ei},${si},'kg',1)" oncontextmenu="return false">+</button>
+          </div>
+          <button class="bw-mini" title="Сделать свой вес" onclick="setBw(${ei},${si},1)">🤸</button>`}
+          <div class="stepper">
+            <button class="bump" onpointerdown="startBump(event,${ei},${si},'reps',-1)" oncontextmenu="return false">−</button>
+            <input class="set-in" type="number" value="${s.reps}" min="0" step="1" inputmode="numeric" onchange="setVal(${ei},${si},'reps',this.value)"><span class="unit">раз</span>
+            <button class="bump" onpointerdown="startBump(event,${ei},${si},'reps',1)" oncontextmenu="return false">+</button>
+          </div>
+          <button class="set-del" onclick="delSet(${ei},${si})">✕</button>
+        </div>`).join("")}
+      <button class="btn btn-outline btn-block" onclick="addSet(${ei})">+ Подход</button>
+    </div>`).join("");
+}
+
+window.setVal = (ei, si, field, v) => {
+  const s = state.draft.entries[ei].sets[si];
+  s[field] = Math.max(0, parseFloat(v) || 0);
+  save();
+};
+window.setBw = (ei, si, on) => {
+  state.draft.entries[ei].sets[si].bw = !!on;
+  save(); renderWorkout();
+};
+
+// Удержание +/−: цифра бежит сама
+let bumpTimer = null, bumpDelay = null;
+window.startBump = (ev, ei, si, field, delta) => {
+  ev.preventDefault();
+  const go = () => window.bump(ei, si, field, delta);
+  go();
+  bumpDelay = setTimeout(() => { bumpTimer = setInterval(go, 90); }, 400);
+};
+window.stopBump = () => { clearTimeout(bumpDelay); clearInterval(bumpTimer); };
+document.addEventListener("pointerup", stopBump);
+document.addEventListener("pointercancel", stopBump);
+
+/* --- Сауна --- */
+$("btnAddSauna").addEventListener("click", () => {
+  state.draft.sauna.push({ min: 10, shower: null });
+  save(); renderWorkout();
+});
+window.delSauna = (i) => {
+  state.draft.sauna.splice(i, 1);
+  save(); renderWorkout();
+};
+window.addShower = (i) => {
+  state.draft.sauna[i].shower = true;
+  save(); renderWorkout();
+};
+window.delShower = (i) => {
+  state.draft.sauna[i].shower = null;
+  save(); renderWorkout();
+};
+window.setSauna = (i, field, v) => {
+  state.draft.sauna[i].min = Math.max(0, parseFloat(v) || 0);
+  save();
+};
+const sBump = (i, field, delta) => {
+  const s = state.draft.sauna[i];
+  s.min = Math.max(0, s.min + delta);
+  save(); renderWorkout();
+};
+window.startSBump = (ev, i, field, delta) => {
+  ev.preventDefault();
+  const go = () => sBump(i, field, delta);
+  go();
+  bumpDelay = setTimeout(() => { bumpTimer = setInterval(go, 90); }, 400);
+};
+
+/* --- Шаблоны тренировок --- */
+$("btnSaveTemplate").addEventListener("click", () => {
+  const d = state.draft;
+  if (!d || !d.entries.length) { alert("Сначала добавь упражнения — шаблон из пустой тренировки не сохранить."); return; }
+  const name = prompt("Название шаблона:", "Моя тренировка");
+  if (!name || !name.trim()) return;
+  state.templates.push({
+    id: "t" + Date.now(),
+    name: name.trim(),
+    entries: JSON.parse(JSON.stringify(d.entries)),
+    sauna: d.sauna || [],
+  });
+  save(); renderWorkout();
+});
+
+window.startFromTemplate = (id) => {
+  const t = state.templates.find((x) => x.id === id);
+  if (!t) return;
+  state.draft = {
+    entries: JSON.parse(JSON.stringify(t.entries)),
+    durH: 1, durM: 0,
+    sauna: JSON.parse(JSON.stringify(t.sauna || [])),
+  };
+  showActive = true;
+  save(); renderWorkout();
+};
+
+window.delTemplate = (id) => {
+  if (!confirm("Удалить шаблон?")) return;
+  state.templates = state.templates.filter((t) => t.id !== id);
+  save(); renderWorkout();
+};
+
+window.bump = (ei, si, field, delta) => {
+  const s = state.draft.entries[ei].sets[si];
+  s[field] = Math.max(0, s[field] + delta);
+  save(); renderWorkout();
+};
+window.addSet = (ei) => {
+  const sets = state.draft.entries[ei].sets;
+  const last = sets[sets.length - 1];
+  sets.push({ kg: last ? last.kg : 20, reps: last ? last.reps : 10, bw: last ? !!last.bw : false });
+  save(); renderWorkout();
+};
+window.delSet = (ei, si) => {
+  state.draft.entries[ei].sets.splice(si, 1);
+  save(); renderWorkout();
+};
+window.removeEntry = (ei) => {
+  if (!confirm("Убрать упражнение?")) return;
+  state.draft.entries.splice(ei, 1);
+  save(); renderWorkout();
+};
+
+/* --- Выбор упражнения: разделы -> упражнения --- */
+$("btnAddExercise").addEventListener("click", () => {
+  pickerGroup = null;
+  $("pickerSearch").value = "";
+  renderPicker();
+  $("pickerModal").classList.remove("hidden");
+});
+$("btnClosePicker").addEventListener("click", () => $("pickerModal").classList.add("hidden"));
+$("btnPickerBack").addEventListener("click", () => { pickerGroup = null; renderPicker(); });
+$("pickerSearch").addEventListener("input", renderPicker);
+$("pickerModal").addEventListener("click", (e) => { if (e.target.id === "pickerModal") $("pickerModal").classList.add("hidden"); });
+
+function renderPicker() {
+  const q = $("pickerSearch").value.trim();
+  const ql = q.toLowerCase();
+  $("btnPickerBack").classList.toggle("hidden", !pickerGroup);
+
+  // Поиск по всем упражнениям + кнопка "добавить своё"
+  if (q) {
+    const found = state.exercises.filter((e) => e.name.toLowerCase().includes(ql));
+    $("pickerList").innerHTML =
+      found.map((e) => `
+        <button class="pick-item" onclick="pickExercise('${e.id}')">
+          ${gInfo(e.group).emoji} ${esc(e.name)}
+        </button>`).join("") +
+      `<button class="pick-add" onclick="addCustomExercise()">＋ Добавить «${esc(q)}»</button>`;
+    return;
+  }
+
+  // Уровень 1: группы мышц
+  if (!pickerGroup) {
+    const groups = [...new Set(state.exercises.map((e) => e.group || "Прочее"))];
+    $("pickerList").innerHTML = `<div class="group-grid">` + groups.map((g) => {
+      const cnt = state.exercises.filter((e) => (e.group || "Прочее") === g).length;
+      const gi = gInfo(g);
+      return `<button class="group-tile" onclick="openGroup('${esc(g)}')" style="border-top:3px solid ${gi.color}">
+        <span class="g-emoji">${gi.emoji}</span>${esc(g)}<small>${cnt} упр.</small>
+      </button>`;
+    }).join("") + `</div>`;
+    return;
+  }
+
+  // Уровень 2: упражнения группы
+  const list = state.exercises.filter((e) => (e.group || "Прочее") === pickerGroup);
+  $("pickerList").innerHTML =
+    `<div class="pick-group-title">${gInfo(pickerGroup).emoji} ${esc(pickerGroup)}</div>` +
+    list.map((e) => `<button class="pick-item" onclick="pickExercise('${e.id}')">${esc(e.name)}</button>`).join("") +
+    `<button class="pick-add" onclick="addCustomExercise('${esc(pickerGroup)}')">＋ Своё упражнение в «${esc(pickerGroup)}»</button>`;
+}
+
+window.openGroup = (g) => { pickerGroup = g; renderPicker(); };
+
+window.pickExercise = (id) => {
+  const ex = state.exercises.find((e) => e.id === id);
+  if (!ex) return;
+  addEntry(ex);
+};
+
+window.addCustomExercise = (group) => {
+  const name = $("pickerSearch").value.trim() || prompt("Название упражнения:");
+  if (!name) return;
+  const ex = { id: "c" + Date.now(), name, group: group || "Прочее", custom: true };
+  state.exercises.push(ex);
+  addEntry(ex);
+};
+
+function addEntry(ex) {
+  // подставляем вес и повторы из прошлой тренировки с этим упражнением
+  let first = { kg: 20, reps: 10 };
+  for (const w of state.workouts) {
+    const prev = w.entries.find((e) => e.name === ex.name);
+    if (prev && prev.sets.length) { first = { ...prev.sets[prev.sets.length - 1] }; break; }
+  }
+  state.draft.entries.push({ exerciseId: ex.id, name: ex.name, group: ex.group, sets: [first] });
+  save();
+  $("pickerModal").classList.add("hidden");
+  renderWorkout();
+}
+
+/* ================= ИСТОРИЯ ================= */
+
+function renderHistory() {
+  const w = state.workouts;
+  $("historyList").innerHTML = w.length ? w.map((x) => {
+    const badges = [x.warmup && "🔥 разминка", x.stretch && "🧘 растяжка", x.sauna && x.sauna.length && `🧖 сауна ×${x.sauna.length}`].filter(Boolean);
+    return `
+      <div class="card hist-card" onclick="showDetail('${x.id}')">
+        <div class="top">
+          <span class="hist-date">${fmtDate(x.dateISO)}</span>
+          <span class="top-right"><span class="hist-dur">⏱ ${fmtDur(x.durationMin)}</span><button class="set-del hist-del" title="Удалить" onclick="event.stopPropagation();delWorkout('${x.id}')">✕</button></span>
+        </div>
+        <div class="hist-ex">${x.entries.length} упр. · ${x.entries.reduce((n, e) => n + e.sets.length, 0)} подходов</div>
+        ${badges.length ? `<div class="badges">${badges.map((b) => `<span class="badge">${b}</span>`).join("")}</div>` : ""}
+      </div>`;
+  }).join("") : '<p class="empty">Пока нет тренировок.<br>Начни первую на вкладке «Тренировка»!</p>';
+}
+
+window.delWorkout = (id) => {
+  if (!confirm("Удалить тренировку из истории?")) return;
+  state.workouts = state.workouts.filter((w) => w.id !== id);
+  save(); renderHistory();
+};
+
+window.showDetail = (id) => {
+  const w = state.workouts.find((x) => x.id === id);
+  if (!w) return;
+  $("detailTitle").textContent = new Date(w.dateISO).toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "short" });
+  $("detailBody").innerHTML =
+    `<p class="card-sub">Длительность: ${fmtDur(w.durationMin)}</p>` +
+    (w.sauna && w.sauna.length ? `<p class="card-sub">🧖 Сауна: ${w.sauna.map((s) => s.min + " мин" + (s.shower ? " + 🚿" : "")).join(" · ")}</p>` : "") +
+    w.entries.map((e) => `
+      <div class="det-ex">
+        <div class="n">${esc(e.name)}</div>
+        <div class="det-sets">${e.sets.map((s, i) => `${i + 1}) ${isBw(e, s) ? "свой вес" : s.kg + " кг"} × ${s.reps}`).join(" · ")}</div>
+      </div>`).join("") +
+    `<button class="btn btn-primary btn-block" onclick="editWorkout('${w.id}')">✏️ Редактировать</button>`;
+  $("detailModal").classList.remove("hidden");
+};
+
+// Загрузить сохранённую тренировку обратно в редактор
+window.editWorkout = (id) => {
+  const w = state.workouts.find((x) => x.id === id);
+  if (!w) return;
+  state.draft = {
+    entries: JSON.parse(JSON.stringify(w.entries)),
+    durH: Math.floor((w.durationMin || 0) / 60),
+    durM: (w.durationMin || 0) % 60,
+    sauna: JSON.parse(JSON.stringify(w.sauna || [])),
+    editId: id,
+  };
+  $("detailModal").classList.add("hidden");
+  showActive = true;
+  save();
+  // переключаемся на вкладку тренировки
+  document.querySelector('.tab[data-screen="workout"]').click();
+};
+$("btnCloseDetail").addEventListener("click", () => $("detailModal").classList.add("hidden"));
+$("detailModal").addEventListener("click", (e) => { if (e.target.id === "detailModal") $("detailModal").classList.add("hidden"); });
+
+// флаг "свой вес" может быть у подхода (s.bw) или у всего упражнения из старых записей (e.bw)
+const isBw = (e, s) => (s.bw !== undefined ? !!s.bw : !!e.bw);
+
+/* ================= ПРОГРЕСС ================= */
+
+function renderProgress() {
+  const seen = new Map();
+  state.workouts.forEach((w) => w.entries.forEach((e) => { if (!seen.has(e.name)) seen.set(e.name, e); }));
+  const names = [...seen.keys()];
+
+  if (!names.length) {
+    $("progressSelect").innerHTML = "";
+    $("progressBody").innerHTML = '<p class="empty">После первых тренировок здесь появится прогресс по каждому упражнению.</p>';
+    return;
+  }
+
+  const sel = $("progressSelect");
+  const prev = sel.value;
+  sel.innerHTML = names.map((n) => `<option>${esc(n)}</option>`).join("");
+  if (names.includes(prev)) sel.value = prev;
+  sel.onchange = renderProgressBody;
+  renderProgressBody();
+}
+
+function renderProgressBody() {
+  const name = $("progressSelect").value;
+  const rows = [];
+  [...state.workouts].reverse().forEach((w) => {
+    w.entries.forEach((e) => {
+      if (e.name !== name) return;
+      const kgSets = e.sets.filter((s) => !isBw(e, s));
+      const dd = new Date(w.dateISO);
+      const short = `${dd.getDate()}.${dd.getMonth() + 1}`;
+      if (kgSets.length) {
+        // лучший подход: макс. вес, а при равном весе — макс. повторов
+        const top = kgSets.reduce((a, b) => (a.kg > b.kg ? a : b.kg > a.kg ? b : a.reps >= b.reps ? a : b));
+        rows.push({ date: fmtDate(w.dateISO), short, kg: top.kg, reps: top.reps, unit: "кг", label: `${top.kg} кг × ${top.reps}` });
+      } else {
+        const maxReps = Math.max(...e.sets.map((s) => s.reps));
+        rows.push({ date: fmtDate(w.dateISO), short, kg: null, reps: maxReps, unit: "раз", label: `свой вес × ${maxReps}` });
+      }
+    });
+  });
+
+  if (!rows.length) { $("progressBody").innerHTML = '<p class="empty">Нет данных</p>'; return; }
+
+  const unit = rows[0].unit;
+  let chart = "";
+  if (rows.length >= 2) {
+    const max = Math.max(...rows.map((r) => r.kg ?? r.reps));
+    chart = `<div class="chart">` + rows.map((r) => {
+      const v = r.kg ?? r.reps;
+      return `<div class="col"><span class="cv">${v}${r.kg == null ? "×" : ""}</span><div class="bar" style="height:${Math.max(5, (v / max) * 78)}%"></div><span class="cd">${r.short}</span></div>`;
+    }).join("") + `</div>
+    <p class="card-sub">${unit === "кг" ? "Макс. вес, кг" : "Макс. повторов"} — слева старые, справа новые</p>`;
+  } else {
+    chart = `<p class="card-sub">Сделай ещё одну тренировку с этим упражнением — здесь появится сравнение и график.</p>`;
+  }
+
+  const list = rows.map((r, i) => {
+    let txt = "—", cls = "same";
+    if (i) {
+      const p = rows[i - 1];
+      const parts = [];
+      if (r.kg != null && p.kg != null && r.kg !== p.kg) parts.push((r.kg > p.kg ? "+" : "") + (r.kg - p.kg) + " кг");
+      if (r.reps !== p.reps) parts.push((r.reps > p.reps ? "+" : "") + (r.reps - p.reps) + " раз");
+      txt = parts.length ? parts.join(" ") : "=";
+      const primary = (r.kg != null && p.kg != null && r.kg !== p.kg) ? r.kg - p.kg : r.reps - p.reps;
+      cls = primary > 0 ? "up" : primary < 0 ? "down" : "same";
+    }
+    return `<div class="prog-row"><span class="prog-date">${r.date}</span><span class="prog-val">${r.label}</span><span class="diff ${cls}">${txt}</span></div>`;
+  }).join("");
+
+  $("progressBody").innerHTML = chart + list;
+}
+
+/* ================= УПРАЖНЕНИЯ ================= */
+
+function renderExercises() {
+  const groups = [...new Set(state.exercises.map((e) => e.group || "Прочее"))];
+  $("newExGroup").innerHTML = groups.map((g) => `<option>${esc(g)}</option>`).join("");
+  $("exerciseList").innerHTML = groups.map((g) => `
+    <div class="pick-group" style="color:${gInfo(g).color}">${gInfo(g).emoji} ${esc(g)}</div>
+    ${state.exercises.filter((e) => (e.group || "Прочее") === g).map((e) => `
+      <div class="lib-item">
+        <span>${esc(e.name)}</span>
+        ${e.custom ? `<button class="set-del" onclick="delExercise('${e.id}')">✕</button>` : ""}
+      </div>`).join("")}
+  `).join("");
+}
+
+$("btnAddEx").addEventListener("click", () => {
+  const name = $("newExName").value.trim();
+  if (!name) return;
+  state.exercises.push({ id: "c" + Date.now(), name, group: $("newExGroup").value, custom: true });
+  $("newExName").value = "";
+  save(); renderExercises();
+});
+
+window.delExercise = (id) => {
+  if (!confirm("Удалить упражнение из списка?")) return;
+  state.exercises = state.exercises.filter((e) => e.id !== id);
+  save(); renderExercises();
+};
+
+/* ================= ТЕМЫ ================= */
+
+function applyTheme() {
+  const t = THEMES.find((x) => x.id === state.theme) || THEMES[0];
+  document.body.dataset.theme = t.id;
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", t.sw[0]);
+}
+
+$("btnSettings").addEventListener("click", () => {
+  renderThemes();
+  $("settingsModal").classList.remove("hidden");
+});
+$("btnCloseSettings").addEventListener("click", () => $("settingsModal").classList.add("hidden"));
+$("settingsModal").addEventListener("click", (e) => { if (e.target.id === "settingsModal") $("settingsModal").classList.add("hidden"); });
+
+function renderThemes() {
+  $("themeGrid").innerHTML = THEMES.map((t) => `
+    <button class="theme-tile ${state.theme === t.id || (!state.theme && t.id === "dark") ? "on" : ""}" onclick="setTheme('${t.id}')">
+      <span class="theme-sw" style="background:linear-gradient(135deg,${t.sw[0]} 45%,${t.sw[1]} 55%,${t.sw[2]})"></span>
+      ${t.name}
+    </button>`).join("");
+}
+window.setTheme = (id) => {
+  state.theme = id;
+  save(); applyTheme(); renderThemes();
+};
+
+/* --- PWA --- */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+applyTheme();
+showActive = !!state.draft; // незавершённая тренировка открывается сразу
+renderWorkout();

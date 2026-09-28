@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <title>Зал — дневник тренировок</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1 id="screenTitle">🏋️ Зал</h1>
+    <button id="btnSettings" class="gear" title="Темы оформления">⚙️</button>
+  </header>
+
+  <main id="screens">
+    <!-- ===== ТРЕНИРОВКА ===== -->
+    <section id="screen-workout" class="screen active">
+      <div id="workoutIdle" class="idle">
+        <p class="idle-emoji">🏋️</p>
+        <p class="idle-text">Готов к тренировке?</p>
+        <button id="btnStartWorkout" class="btn btn-primary btn-big">Добавить тренировку</button>
+        <button id="btnDiscardWorkout" class="btn btn-text-danger hidden">Отменить тренировку</button>
+        <div id="templates"></div>
+      </div>
+
+      <div id="workoutActive" class="hidden">
+        <button id="btnBackWorkout" class="btn btn-back">← Назад</button>
+
+        <div id="entries"></div>
+
+        <button id="btnAddExercise" class="btn btn-outline btn-block">+ Упражнение</button>
+
+        <div class="card duration-card">
+          <div class="card-title">⏱ Длительность</div>
+          <div class="dur-row">
+            <input type="number" id="durH" min="0" max="12" inputmode="numeric">
+            <span class="dur-unit">ч</span>
+            <input type="number" id="durM" min="0" max="59" step="5" inputmode="numeric">
+            <span class="dur-unit">мин</span>
+          </div>
+        </div>
+
+        <div class="card sauna-card">
+          <div class="card-title">🧖 Сауна</div>
+          <div id="saunaList"></div>
+          <button id="btnAddSauna" class="btn btn-outline btn-block">+ Заход</button>
+        </div>
+
+        <button id="btnSaveTemplate" class="btn btn-outline btn-block">💾 Сохранить как шаблон</button>
+        <button id="btnFinishWorkout" class="btn btn-success btn-block">✔ Завершить тренировку</button>
+      </div>
+    </section>
+
+    <!-- ===== ИСТОРИЯ ===== -->
+    <section id="screen-history" class="screen">
+      <div id="historyList"></div>
+    </section>
+
+    <!-- ===== ПРОГРЕСС ===== -->
+    <section id="screen-progress" class="screen">
+      <select id="progressSelect" class="select"></select>
+      <div id="progressBody"></div>
+    </section>
+
+    <!-- ===== УПРАЖНЕНИЯ ===== -->
+    <section id="screen-exercises" class="screen">
+      <div class="row">
+        <input id="newExName" type="text" placeholder="Новое упражнение..." maxlength="60">
+        <select id="newExGroup" class="select select-small"></select>
+        <button id="btnAddEx" class="btn btn-small">+</button>
+      </div>
+      <div id="exerciseList"></div>
+    </section>
+  </main>
+
+  <!-- Модалка выбора упражнения: разделы -> упражнения -->
+  <div id="pickerModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <button id="btnPickerBack" class="btn btn-small hidden">←</button>
+        <input id="pickerSearch" type="text" placeholder="Название упражнения...">
+        <button id="btnClosePicker" class="btn btn-small">✕</button>
+      </div>
+      <div id="pickerList" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Модалка настроек/тем -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <strong>🎨 Тема оформления</strong>
+        <button id="btnCloseSettings" class="btn btn-small">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="themeGrid" class="theme-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка деталей тренировки -->
+  <div id="detailModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <strong id="detailTitle"></strong>
+        <button id="btnCloseDetail" class="btn btn-small">✕</button>
+      </div>
+      <div id="detailBody" class="modal-body"></div>
+    </div>
+  </div>
+
+  <nav class="tabbar">
+    <button class="tab active" data-screen="workout"><span class="ic">🏋️</span>Тренировка</button>
+    <button class="tab" data-screen="history"><span class="ic">📋</span>История</button>
+    <button class="tab" data-screen="progress"><span class="ic">📈</span>Прогресс</button>
+    <button class="tab" data-screen="exercises"><span class="ic">💪</span>Упражнения</button>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
