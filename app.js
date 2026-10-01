@@ -499,8 +499,9 @@ window.editWorkout = (id) => {
   $("detailModal").classList.add("hidden");
   showActive = true;
   save();
-  // переключаемся на вкладку тренировки
+  // переключаемся на вкладку тренировки и перерисовываем её в режиме редактора
   document.querySelector('.tab[data-screen="workout"]').click();
+  renderWorkout();
 };
 $("btnCloseDetail").addEventListener("click", () => $("detailModal").classList.add("hidden"));
 $("detailModal").addEventListener("click", (e) => { if (e.target.id === "detailModal") $("detailModal").classList.add("hidden"); });
