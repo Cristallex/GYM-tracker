@@ -26,7 +26,10 @@
       </div>
 
       <div id="workoutActive" class="hidden">
-        <button id="btnBackWorkout" class="btn btn-back">← Назад</button>
+        <div class="active-head">
+          <button id="btnBackWorkout" class="btn btn-back">← Назад</button>
+          <div id="workoutTimer" class="workout-timer hidden">⏱ 0:00:00</div>
+        </div>
 
         <div id="entries"></div>
 
@@ -40,12 +43,6 @@
             <input type="number" id="durM" min="0" max="59" step="5" inputmode="numeric">
             <span class="dur-unit">мин</span>
           </div>
-        </div>
-
-        <div class="card sauna-card">
-          <div class="card-title">🧖 Сауна</div>
-          <div id="saunaList"></div>
-          <button id="btnAddSauna" class="btn btn-outline btn-block">+ Заход</button>
         </div>
 
         <button id="btnSaveTemplate" class="btn btn-outline btn-block">💾 Сохранить как шаблон</button>

@@ -108,7 +108,7 @@ function load() {
     exercises: DEFAULT_EXERCISES.map(([name, group], i) => ({ id: "d" + i, name, group, custom: false })),
     workouts: [],
     templates: [], // [{id,name,entries}]
-    draft: null, // {entries:[{exerciseId,name,group,sets:[{kg,reps,bw}]}], warmup, stretch, durH, durM, sauna:[{min,shower}]}
+    draft: null, // {entries:[{exerciseId,name,group,sets:[{kg,reps,bw}]}], durH, durM, startedAt, durTouched, editId}
   };
 }
 
@@ -149,7 +149,10 @@ let showActive = false; // показывать ли экран активной
 
 $("btnStartWorkout").addEventListener("click", () => {
   if (!state.draft) {
-    state.draft = { entries: [], durH: 1, durM: 0, sauna: [] };
+    state.draft = { entries: [], durH: 1, durM: 0, startedAt: Date.now() };
+    save();
+  } else if (!state.draft.startedAt && !state.draft.editId) {
+    state.draft.startedAt = Date.now(); // старый черновик без таймера — включаем сейчас
     save();
   }
   showActive = true;
@@ -177,11 +180,11 @@ $("btnFinishWorkout").addEventListener("click", () => {
     state.draft = null; save(); renderWorkout(); return;
   }
   if (!confirm(d.editId ? "Сохранить изменения?" : "Завершить и сохранить тренировку?")) return;
-  const data = {
-    durationMin: (parseInt(d.durH) || 0) * 60 + (parseInt(d.durM) || 0),
-    sauna: d.sauna || [],
-    entries: d.entries,
-  };
+  // автодлительность из таймера; если пользователь правил поля руками — уважаем его ввод
+  const durationMin = (d.startedAt && !d.editId && !d.durTouched)
+    ? Math.max(1, Math.round((Date.now() - d.startedAt) / 60000))
+    : (parseInt(d.durH) || 0) * 60 + (parseInt(d.durM) || 0);
+  const data = { durationMin, entries: d.entries };
   if (d.editId) {
     const w = state.workouts.find((x) => x.id === d.editId);
     if (w) Object.assign(w, data);
@@ -194,8 +197,28 @@ $("btnFinishWorkout").addEventListener("click", () => {
   renderWorkout();
 });
 
-$("durH").addEventListener("input", (e) => { state.draft.durH = e.target.value; save(); });
-$("durM").addEventListener("input", (e) => { state.draft.durM = e.target.value; save(); });
+$("durH").addEventListener("input", (e) => { state.draft.durH = e.target.value; state.draft.durTouched = true; save(); });
+$("durM").addEventListener("input", (e) => { state.draft.durM = e.target.value; state.draft.durTouched = true; save(); });
+
+/* --- Таймер тренировки --- */
+let workoutTicker = null;
+
+function tickWorkout() {
+  const d = state.draft;
+  if (!d || !d.startedAt || d.editId) return stopWorkoutTick();
+  const sec = Math.max(0, Math.floor((Date.now() - d.startedAt) / 1000));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  $("workoutTimer").textContent = `⏱ ${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  // автозаполнение полей длительности — не трогаем, если пользователь печатает сам
+  if (!d.durTouched) {
+    const eh = Math.floor(sec / 3600), em = Math.floor((sec % 3600) / 60);
+    d.durH = eh; d.durM = em;
+    if (document.activeElement !== $("durH")) $("durH").value = eh;
+    if (document.activeElement !== $("durM")) $("durM").value = em;
+  }
+}
+function startWorkoutTick() { stopWorkoutTick(); tickWorkout(); workoutTicker = setInterval(tickWorkout, 1000); }
+function stopWorkoutTick() { clearInterval(workoutTicker); workoutTicker = null; }
 
 function renderWorkout() {
   const d = state.draft;
@@ -204,6 +227,11 @@ function renderWorkout() {
   $("workoutActive").classList.toggle("hidden", !active);
   $("btnStartWorkout").textContent = d ? "Продолжить тренировку" : "Добавить тренировку";
   $("btnDiscardWorkout").classList.toggle("hidden", !d);
+
+  // чип таймера — только в новой тренировке (в редактировании не показываем)
+  const hasTimer = !!(active && d.startedAt && !d.editId);
+  $("workoutTimer").classList.toggle("hidden", !hasTimer);
+  if (hasTimer) startWorkoutTick(); else stopWorkoutTick();
 
   // Шаблоны на стартовом экране
   $("templates").innerHTML = state.templates.length
@@ -223,25 +251,6 @@ function renderWorkout() {
   $("btnFinishWorkout").textContent = d.editId ? "💾 Сохранить изменения" : "✔ Завершить тренировку";
   $("durH").value = d.durH;
   $("durM").value = d.durM;
-  d.sauna = d.sauna || [];
-
-  $("saunaList").innerHTML = d.sauna.map((s, i) => `
-    <div class="set-row">
-      <span class="set-num">${i + 1}</span>
-      <div class="stepper">
-        <button class="bump" onpointerdown="startSBump(event,${i},'min',-1)" oncontextmenu="return false">−</button>
-        <input class="set-in" type="number" value="${s.min}" min="0" inputmode="numeric" onchange="setSauna(${i},'min',this.value)"><span class="unit">мин</span>
-        <button class="bump" onpointerdown="startSBump(event,${i},'min',1)" oncontextmenu="return false">+</button>
-      </div>
-      ${s.shower ? "" : `<button class="bw-mini" title="Добавить холодный душ" onclick="addShower(${i})">🚿</button>`}
-      <button class="set-del" onclick="delSauna(${i})">✕</button>
-    </div>
-    ${s.shower ? `
-    <div class="set-row sauna-sub">
-      <span class="set-num">🚿</span>
-      <span class="sub-label">холодный душ</span>
-      <button class="set-del" onclick="delShower(${i})">✕</button>
-    </div>` : ""}`).join("");
 
   $("entries").innerHTML = d.entries.map((e, ei) => `
     <div class="card">
@@ -296,39 +305,6 @@ window.stopBump = () => { clearTimeout(bumpDelay); clearInterval(bumpTimer); };
 document.addEventListener("pointerup", stopBump);
 document.addEventListener("pointercancel", stopBump);
 
-/* --- Сауна --- */
-$("btnAddSauna").addEventListener("click", () => {
-  state.draft.sauna.push({ min: 10, shower: null });
-  save(); renderWorkout();
-});
-window.delSauna = (i) => {
-  state.draft.sauna.splice(i, 1);
-  save(); renderWorkout();
-};
-window.addShower = (i) => {
-  state.draft.sauna[i].shower = true;
-  save(); renderWorkout();
-};
-window.delShower = (i) => {
-  state.draft.sauna[i].shower = null;
-  save(); renderWorkout();
-};
-window.setSauna = (i, field, v) => {
-  state.draft.sauna[i].min = Math.max(0, parseFloat(v) || 0);
-  save();
-};
-const sBump = (i, field, delta) => {
-  const s = state.draft.sauna[i];
-  s.min = Math.max(0, s.min + delta);
-  save(); renderWorkout();
-};
-window.startSBump = (ev, i, field, delta) => {
-  ev.preventDefault();
-  const go = () => sBump(i, field, delta);
-  go();
-  bumpDelay = setTimeout(() => { bumpTimer = setInterval(go, 90); }, 400);
-};
-
 /* --- Шаблоны тренировок --- */
 $("btnSaveTemplate").addEventListener("click", () => {
   const d = state.draft;
@@ -339,7 +315,6 @@ $("btnSaveTemplate").addEventListener("click", () => {
     id: "t" + Date.now(),
     name: name.trim(),
     entries: JSON.parse(JSON.stringify(d.entries)),
-    sauna: d.sauna || [],
   });
   save(); renderWorkout();
 });
@@ -350,7 +325,7 @@ window.startFromTemplate = (id) => {
   state.draft = {
     entries: JSON.parse(JSON.stringify(t.entries)),
     durH: 1, durM: 0,
-    sauna: JSON.parse(JSON.stringify(t.sauna || [])),
+    startedAt: Date.now(),
   };
   showActive = true;
   save(); renderWorkout();
@@ -467,7 +442,7 @@ function addEntry(ex) {
 function renderHistory() {
   const w = state.workouts;
   $("historyList").innerHTML = w.length ? w.map((x) => {
-    const badges = [x.warmup && "🔥 разминка", x.stretch && "🧘 растяжка", x.sauna && x.sauna.length && `🧖 сауна ×${x.sauna.length}`].filter(Boolean);
+    const badges = [x.warmup && "🔥 разминка", x.stretch && "🧘 растяжка"].filter(Boolean);
     return `
       <div class="card hist-card" onclick="showDetail('${x.id}')">
         <div class="top">
@@ -492,7 +467,6 @@ window.showDetail = (id) => {
   $("detailTitle").textContent = new Date(w.dateISO).toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "short" });
   $("detailBody").innerHTML =
     `<p class="card-sub">Длительность: ${fmtDur(w.durationMin)}</p>` +
-    (w.sauna && w.sauna.length ? `<p class="card-sub">🧖 Сауна: ${w.sauna.map((s) => s.min + " мин" + (s.shower ? " + 🚿" : "")).join(" · ")}</p>` : "") +
     w.entries.map((e) => `
       <div class="det-ex">
         <div class="n">${esc(e.name)}</div>
@@ -510,7 +484,6 @@ window.editWorkout = (id) => {
     entries: JSON.parse(JSON.stringify(w.entries)),
     durH: Math.floor((w.durationMin || 0) / 60),
     durM: (w.durationMin || 0) % 60,
-    sauna: JSON.parse(JSON.stringify(w.sauna || [])),
     editId: id,
   };
   $("detailModal").classList.add("hidden");

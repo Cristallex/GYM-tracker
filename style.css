@@ -203,31 +203,31 @@ main { padding: 8px 16px 16px; max-width: 520px; margin: 0 auto; overflow-x: hid
   vertical-align: 2px;
 }
 
-/* Подходы */
+/* Подходы — компактнее, чтобы меньше промахиваться по +/− */
 .set-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 0;
+  gap: 5px;
+  padding: 6px 0;
   border-top: 1px solid var(--border);
   flex-wrap: wrap;
 }
 .set-num {
-  width: 24px; height: 24px;
+  width: 22px; height: 22px;
   display: grid; place-items: center;
   border-radius: var(--rS);
   background: var(--card2);
   color: var(--muted);
-  font-size: 12px; font-weight: 700;
+  font-size: 11px; font-weight: 700;
 }
-.stepper { display: flex; align-items: center; gap: 6px; flex: 1; }
+.stepper { display: flex; align-items: center; gap: 4px; flex: 1; }
 .stepper button {
-  width: 40px; height: 42px;
+  width: 32px; height: 34px;
   border-radius: var(--rS);
   border: 1px solid var(--border);
   background: var(--card2);
   color: var(--accent);
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 700;
   cursor: pointer;
   touch-action: none;
@@ -238,15 +238,15 @@ main { padding: 8px 16px 16px; max-width: 520px; margin: 0 auto; overflow-x: hid
 }
 .stepper button:active { background: var(--accent2); color: #fff; }
 .stepper .set-in {
-  width: 46px;
-  min-width: 38px;
+  width: 42px;
+  min-width: 36px;
   flex-shrink: 1;
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--rS);
-  padding: 7px 4px;
+  padding: 5px 3px;
   color: var(--text);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   text-align: center;
   outline: none;
@@ -256,12 +256,12 @@ main { padding: 8px 16px 16px; max-width: 520px; margin: 0 auto; overflow-x: hid
 .stepper .set-in:focus { border-color: var(--accent); }
 .stepper .set-in::-webkit-outer-spin-button,
 .stepper .set-in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.stepper .unit { font-size: 11px; color: var(--muted); font-weight: 400; }
-.set-del { background: none; border: none; color: var(--red); font-size: 17px; cursor: pointer; padding: 8px; }
+.stepper .unit { font-size: 10px; color: var(--muted); font-weight: 400; }
+.set-del { background: none; border: none; color: var(--red); font-size: 15px; cursor: pointer; padding: 5px; }
 
 /* Вес тела у подхода */
 .bw-mini {
-  width: 30px; height: 42px;
+  width: 28px; height: 34px;
   border-radius: var(--rS);
   border: 1px solid var(--border);
   background: transparent;
@@ -277,8 +277,8 @@ main { padding: 8px 16px 16px; max-width: 520px; margin: 0 auto; overflow-x: hid
   color: var(--accent);
   background: rgba(56,189,248,.08);
   font-weight: 700;
-  font-size: 13px;
-  padding: 10px 4px;
+  font-size: 12px;
+  padding: 7px 4px;
   border: 1px dashed var(--accent);
   border-radius: var(--rS);
   cursor: pointer;
@@ -531,7 +531,16 @@ input:focus, .select:focus { border-color: var(--accent); }
   flex-shrink: 0;
 }
 
-/* Сауна — подстрока душа */
-.sauna-sub { padding-left: 12px; }
-.sauna-sub .set-num { background: none; font-size: 15px; }
-.sub-label { color: var(--muted); font-size: 12px; flex: 1; }
+/* Шапка активной тренировки + таймер */
+.active-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.active-head .btn-back { margin-bottom: 0; }
+.workout-timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--accent);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--rM);
+  padding: 7px 14px;
+}
