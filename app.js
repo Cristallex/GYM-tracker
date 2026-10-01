@@ -610,7 +610,7 @@ function renderProgressBody() {
     return `<div class="prog-row"><span class="prog-date">${r.date}</span><span class="prog-val">${fmtSets(r.sets)}</span><span class="diff ${cls}">${txt}</span></div>`;
   }).join("");
 
-  const hint = rows.length >= 2 ? '<p class="card-sub">Разница по подходам: «=·+1·+1» — 1-й без изменений, 2-й и 3-й на 1 больше</p>' : "";
+  const hint = rows.length >= 2 ? '<p class="card-sub">💡 В колонке справа — разница по каждому подходу слева направо: «=» — без изменений, «+1» — на 1 повтор больше.</p>' : "";
   $("progressBody").innerHTML = chart + list + hint;
 }
 
