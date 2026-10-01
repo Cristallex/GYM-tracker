@@ -393,6 +393,9 @@ input:focus, .select:focus { border-color: var(--accent); }
 .diff.up { color: var(--green); }
 .diff.down { color: var(--red); }
 .diff.same { color: var(--muted); }
+.diff .d-up { color: var(--green); }
+.diff .d-down { color: var(--red); }
+.diff .d-same { color: var(--muted); }
 
 .chart { display: flex; align-items: stretch; gap: 6px; height: 140px; margin: 16px 0 4px; }
 .chart .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-width: 0; }

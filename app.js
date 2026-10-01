@@ -551,20 +551,25 @@ const setsDiff = (prev, cur) => {
   const parts = [];
   if (kgD.length) {
     const same = kgD.every((x) => x === kgD[0]);
-    parts.push(same
-      ? `${kgD[0] > 0 ? "+" : ""}${kgD[0]} кг`
-      : kgD.map((x) => (x > 0 ? "+" : "") + x).join("·") + " кг");
+    const sum = kgD.reduce((a, b) => a + b, 0);
+    parts.push({
+      txt: same
+        ? `${kgD[0] > 0 ? "+" : ""}${kgD[0]} кг`
+        : kgD.map((x) => (x > 0 ? "+" : "") + x).join("·") + " кг",
+      cls: sum > 0 ? "up" : sum < 0 ? "down" : "same",
+    });
   }
-  // повторы по подходам: "=·+1·+1"; не показываем нули, если уже есть разница в кг
+  // повторы по подходам с раскраской: каждое число — свой цвет
   if (repD.length && (!kgD.length || repD.some((d) => d !== 0))) {
-    parts.push(repD.map((d) => (d === 0 ? "=" : (d > 0 ? "+" : "") + d)).join("·"));
+    repD.forEach((d) => parts.push({
+      txt: d === 0 ? "=" : (d > 0 ? "+" : "") + d,
+      cls: d > 0 ? "up" : d < 0 ? "down" : "same",
+    }));
   }
-  if (!parts.length) parts.push("=");
   const extra = cur.length - prev.length;
-  if (extra !== 0) parts.push((extra > 0 ? "+" : "") + extra + " подх.");
-  // оценка для цвета: кг весит больше, повторы складываются, новый подход = лёгкий плюс
-  const score = kgD.reduce((a, b) => a + b, 0) * 10 + repD.reduce((a, b) => a + b, 0) + Math.sign(extra) * 0.5;
-  return { text: parts.join(" "), score };
+  if (extra !== 0) parts.push({ txt: (extra > 0 ? "+" : "") + extra + " подх.", cls: extra > 0 ? "up" : "down" });
+  if (!parts.length) parts.push({ txt: "=", cls: "same" });
+  return { parts };
 };
 
 function renderProgressBody() {
@@ -601,17 +606,14 @@ function renderProgressBody() {
   }
 
   const list = rows.map((r, i) => {
-    let txt = "—", cls = "same";
+    let txt = "—";
     if (i) {
-      const d = setsDiff(rows[i - 1].sets, r.sets);
-      txt = d.text;
-      cls = d.score > 0 ? "up" : d.score < 0 ? "down" : "same";
+      txt = setsDiff(rows[i - 1].sets, r.sets).parts.map((p) => `<span class="d-${p.cls}">${p.txt}</span>`).join("·");
     }
-    return `<div class="prog-row"><span class="prog-date">${r.date}</span><span class="prog-val">${fmtSets(r.sets)}</span><span class="diff ${cls}">${txt}</span></div>`;
+    return `<div class="prog-row"><span class="prog-date">${r.date}</span><span class="prog-val">${fmtSets(r.sets)}</span><span class="diff">${txt}</span></div>`;
   }).join("");
 
-  const hint = rows.length >= 2 ? '<p class="card-sub">💡 В колонке справа — разница по каждому подходу слева направо: «=» — без изменений, «+1» — на 1 повтор больше.</p>' : "";
-  $("progressBody").innerHTML = chart + list + hint;
+  $("progressBody").innerHTML = chart + list;
 }
 
 /* ================= УПРАЖНЕНИЯ ================= */
