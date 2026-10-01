@@ -43,6 +43,10 @@
             <input type="number" id="durM" min="0" max="59" step="5" inputmode="numeric">
             <span class="dur-unit">мин</span>
           </div>
+          <div class="dur-row">
+            <span class="dur-unit">📅 дата</span>
+            <input type="date" id="wDate" class="w-date">
+          </div>
         </div>
 
         <button id="btnSaveTemplate" class="btn btn-outline btn-block">💾 Сохранить как шаблон</button>
@@ -93,6 +97,11 @@
       </div>
       <div class="modal-body">
         <div id="themeGrid" class="theme-grid"></div>
+        <div class="data-row">
+          <button id="btnExport" class="btn btn-outline btn-block">📤 Экспорт данных</button>
+          <button id="btnImport" class="btn btn-outline btn-block">📥 Импорт данных</button>
+          <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+        </div>
       </div>
     </div>
   </div>

@@ -125,6 +125,8 @@ const fmtDur = (min) => {
   if (!min) return "—";
   return h ? (m ? `${h} ч ${m} мин` : `${h} ч`) : `${m} мин`;
 };
+const dateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const todayStr = () => dateStr(new Date());
 
 /* --- Навигация по вкладкам --- */
 const TITLES = { workout: "🏋️ Зал", history: "📋 История", progress: "📈 Прогресс", exercises: "💪 Упражнения" };
@@ -184,7 +186,11 @@ $("btnFinishWorkout").addEventListener("click", () => {
   const durationMin = (d.startedAt && !d.editId && !d.durTouched)
     ? Math.max(1, Math.round((Date.now() - d.startedAt) / 60000))
     : (parseInt(d.durH) || 0) * 60 + (parseInt(d.durM) || 0);
-  const data = { durationMin, entries: d.entries };
+  const data = {
+    durationMin,
+    entries: d.entries,
+    dateISO: d.wDate ? new Date(d.wDate + "T12:00:00").toISOString() : new Date().toISOString(),
+  };
   if (d.editId) {
     const w = state.workouts.find((x) => x.id === d.editId);
     if (w) Object.assign(w, data);
@@ -199,6 +205,7 @@ $("btnFinishWorkout").addEventListener("click", () => {
 
 $("durH").addEventListener("input", (e) => { state.draft.durH = e.target.value; state.draft.durTouched = true; save(); });
 $("durM").addEventListener("input", (e) => { state.draft.durM = e.target.value; state.draft.durTouched = true; save(); });
+$("wDate").addEventListener("input", (e) => { state.draft.wDate = e.target.value; save(); });
 
 /* --- Таймер тренировки --- */
 let workoutTicker = null;
@@ -251,6 +258,8 @@ function renderWorkout() {
   $("btnFinishWorkout").textContent = d.editId ? "💾 Сохранить изменения" : "✔ Завершить тренировку";
   $("durH").value = d.durH;
   $("durM").value = d.durM;
+  if (!d.wDate) d.wDate = todayStr();
+  if (document.activeElement !== $("wDate")) $("wDate").value = d.wDate;
 
   $("entries").innerHTML = d.entries.map((e, ei) => `
     <div class="card">
@@ -440,7 +449,7 @@ function addEntry(ex) {
 /* ================= ИСТОРИЯ ================= */
 
 function renderHistory() {
-  const w = state.workouts;
+  const w = [...state.workouts].sort((a, b) => new Date(b.dateISO) - new Date(a.dateISO));
   $("historyList").innerHTML = w.length ? w.map((x) => {
     const badges = [x.warmup && "🔥 разминка", x.stretch && "🧘 растяжка"].filter(Boolean);
     return `
@@ -484,6 +493,7 @@ window.editWorkout = (id) => {
     entries: JSON.parse(JSON.stringify(w.entries)),
     durH: Math.floor((w.durationMin || 0) / 60),
     durM: (w.durationMin || 0) % 60,
+    wDate: dateStr(new Date(w.dateISO)),
     editId: id,
   };
   $("detailModal").classList.add("hidden");
@@ -522,7 +532,7 @@ function renderProgress() {
 function renderProgressBody() {
   const name = $("progressSelect").value;
   const rows = [];
-  [...state.workouts].reverse().forEach((w) => {
+  [...state.workouts].sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO)).forEach((w) => {
     w.entries.forEach((e) => {
       if (e.name !== name) return;
       const kgSets = e.sets.filter((s) => !isBw(e, s));
@@ -626,6 +636,36 @@ window.setTheme = (id) => {
   state.theme = id;
   save(); applyTheme(); renderThemes();
 };
+
+/* --- Экспорт / импорт данных --- */
+$("btnExport").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "zal-backup.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+$("btnImport").addEventListener("click", () => $("importFile").click());
+$("importFile").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const data = JSON.parse(rd.result);
+      if (!data || !Array.isArray(data.exercises) || !Array.isArray(data.workouts)) throw 0;
+      if (!confirm("Импорт заменит все текущие данные. Продолжить?")) return;
+      state = data;
+      save();
+      location.reload();
+    } catch {
+      alert("Не получилось прочитать файл — нужен JSON из «Экспорт данных».");
+    }
+  };
+  rd.readAsText(f);
+});
 
 /* --- PWA --- */
 if ("serviceWorker" in navigator) {

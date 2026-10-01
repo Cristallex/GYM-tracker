@@ -313,7 +313,29 @@ main { padding: 8px 16px 16px; max-width: 520px; margin: 0 auto; overflow-x: hid
 .check-card input:checked ~ .check-box::after { content: "✓"; }
 
 /* Длительность */
-.dur-row { display: flex; align-items: center; gap: 8px; }
+.dur-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dur-row + .dur-row { margin-top: 10px; }
+.w-date {
+  flex: 1;
+  min-width: 130px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--rS);
+  padding: 7px 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+}
+.w-date:focus { border-color: var(--accent); }
+.data-row {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .dur-row input {
   width: 76px;
   background: var(--card2);
