@@ -387,9 +387,9 @@ input:focus, .select:focus { border-color: var(--accent); }
   padding: 11px 0;
   border-top: 1px solid var(--border);
 }
-.prog-date { width: 86px; font-size: 13px; color: var(--muted); }
-.prog-val { flex: 1; font-weight: 600; }
-.diff { font-size: 13px; font-weight: 700; min-width: 60px; text-align: right; }
+.prog-date { width: 76px; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+.prog-val { flex: 1; font-weight: 600; font-size: 12px; min-width: 0; }
+.diff { font-size: 12px; font-weight: 700; min-width: 60px; text-align: right; }
 .diff.up { color: var(--green); }
 .diff.down { color: var(--red); }
 .diff.same { color: var(--muted); }

@@ -530,37 +530,72 @@ function renderProgress() {
   renderProgressBody();
 }
 
+// короткая запись подходов: "60 кг × 12/11/11" или "свой вес × 5/7/8"
+const fmtSets = (sets) => {
+  const allBw = sets.every((s) => s.bw);
+  const kgs = new Set(sets.filter((s) => !s.bw).map((s) => s.kg));
+  if (allBw) return `свой вес × ${sets.map((s) => s.reps).join("/")}`;
+  if (kgs.size === 1 && !allBw) return `${[...kgs][0]} кг × ${sets.map((s) => s.reps).join("/")}`;
+  return sets.map((s) => `${s.bw ? "свой вес" : s.kg + " кг"}×${s.reps}`).join(" · ");
+};
+
+// попарное сравнение подходов: 1-й с 1-м, 2-й со 2-м и т.д.
+const setsDiff = (prev, cur) => {
+  const n = Math.min(prev.length, cur.length);
+  const kgD = [], repD = [];
+  for (let i = 0; i < n; i++) {
+    const a = prev[i], b = cur[i];
+    if (!a.bw && !b.bw && a.kg !== b.kg) kgD.push(b.kg - a.kg); // вес изменился — повторы не сравниваем
+    else repD.push(b.reps - a.reps);
+  }
+  const parts = [];
+  if (kgD.length) {
+    const same = kgD.every((x) => x === kgD[0]);
+    parts.push(same
+      ? `${kgD[0] > 0 ? "+" : ""}${kgD[0]} кг`
+      : kgD.map((x) => (x > 0 ? "+" : "") + x).join("·") + " кг");
+  }
+  // повторы по подходам: "=·+1·+1"; не показываем нули, если уже есть разница в кг
+  if (repD.length && (!kgD.length || repD.some((d) => d !== 0))) {
+    parts.push(repD.map((d) => (d === 0 ? "=" : (d > 0 ? "+" : "") + d)).join("·"));
+  }
+  if (!parts.length) parts.push("=");
+  const extra = cur.length - prev.length;
+  if (extra !== 0) parts.push((extra > 0 ? "+" : "") + extra + " подх.");
+  // оценка для цвета: кг весит больше, повторы складываются, новый подход = лёгкий плюс
+  const score = kgD.reduce((a, b) => a + b, 0) * 10 + repD.reduce((a, b) => a + b, 0) + Math.sign(extra) * 0.5;
+  return { text: parts.join(" "), score };
+};
+
 function renderProgressBody() {
   const name = $("progressSelect").value;
   const rows = [];
   [...state.workouts].sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO)).forEach((w) => {
     w.entries.forEach((e) => {
       if (e.name !== name) return;
-      const kgSets = e.sets.filter((s) => !isBw(e, s));
       const dd = new Date(w.dateISO);
-      const short = `${dd.getDate()}.${dd.getMonth() + 1}`;
-      if (kgSets.length) {
-        // лучший подход: макс. вес, а при равном весе — макс. повторов
-        const top = kgSets.reduce((a, b) => (a.kg > b.kg ? a : b.kg > a.kg ? b : a.reps >= b.reps ? a : b));
-        rows.push({ date: fmtDate(w.dateISO), short, kg: top.kg, reps: top.reps, unit: "кг", label: `${top.kg} кг × ${top.reps}` });
-      } else {
-        const maxReps = Math.max(...e.sets.map((s) => s.reps));
-        rows.push({ date: fmtDate(w.dateISO), short, kg: null, reps: maxReps, unit: "раз", label: `свой вес × ${maxReps}` });
-      }
+      const sets = e.sets.map((s) => ({ kg: s.kg, reps: s.reps, bw: isBw(e, s) }));
+      rows.push({ date: fmtDate(w.dateISO), short: `${dd.getDate()}.${dd.getMonth() + 1}`, sets });
     });
   });
 
   if (!rows.length) { $("progressBody").innerHTML = '<p class="empty">Нет данных</p>'; return; }
 
-  const unit = rows[0].unit;
+  const hasKg = (r) => r.sets.some((s) => !s.bw);
+  // значение столбика: с весом — макс. кг, со своим весом — сумма повторов (чувствительнее к росту)
+  const chartVal = (r) => hasKg(r)
+    ? Math.max(...r.sets.filter((s) => !s.bw).map((s) => s.kg))
+    : r.sets.reduce((a, s) => a + s.reps, 0);
+  const unit = hasKg(rows[0]) ? "кг" : "раз";
+
   let chart = "";
   if (rows.length >= 2) {
-    const max = Math.max(...rows.map((r) => r.kg ?? r.reps));
+    const max = Math.max(...rows.map(chartVal));
     chart = `<div class="chart">` + rows.map((r) => {
-      const v = r.kg ?? r.reps;
-      return `<div class="col"><span class="cv">${v}${r.kg == null ? "×" : ""}</span><div class="bar" style="height:${Math.max(5, (v / max) * 78)}%"></div><span class="cd">${r.short}</span></div>`;
+      const v = chartVal(r);
+      return `<div class="col"><span class="cv">${v}${hasKg(r) ? "" : "×"}</span><div class="bar" style="height:${Math.max(5, (v / max) * 78)}%"></div><span class="cd">${r.short}</span></div>`;
     }).join("") + `</div>
-    <p class="card-sub">${unit === "кг" ? "Макс. вес, кг" : "Макс. повторов"} — слева старые, справа новые</p>`;
+    <p class="card-sub">${unit === "кг" ? "Макс. вес, кг" : "Всего повторов"} — слева старые, справа новые</p>`;
   } else {
     chart = `<p class="card-sub">Сделай ещё одну тренировку с этим упражнением — здесь появится сравнение и график.</p>`;
   }
@@ -568,18 +603,15 @@ function renderProgressBody() {
   const list = rows.map((r, i) => {
     let txt = "—", cls = "same";
     if (i) {
-      const p = rows[i - 1];
-      const parts = [];
-      if (r.kg != null && p.kg != null && r.kg !== p.kg) parts.push((r.kg > p.kg ? "+" : "") + (r.kg - p.kg) + " кг");
-      if (r.reps !== p.reps) parts.push((r.reps > p.reps ? "+" : "") + (r.reps - p.reps) + " раз");
-      txt = parts.length ? parts.join(" ") : "=";
-      const primary = (r.kg != null && p.kg != null && r.kg !== p.kg) ? r.kg - p.kg : r.reps - p.reps;
-      cls = primary > 0 ? "up" : primary < 0 ? "down" : "same";
+      const d = setsDiff(rows[i - 1].sets, r.sets);
+      txt = d.text;
+      cls = d.score > 0 ? "up" : d.score < 0 ? "down" : "same";
     }
-    return `<div class="prog-row"><span class="prog-date">${r.date}</span><span class="prog-val">${r.label}</span><span class="diff ${cls}">${txt}</span></div>`;
+    return `<div class="prog-row"><span class="prog-date">${r.date}</span><span class="prog-val">${fmtSets(r.sets)}</span><span class="diff ${cls}">${txt}</span></div>`;
   }).join("");
 
-  $("progressBody").innerHTML = chart + list;
+  const hint = rows.length >= 2 ? '<p class="card-sub">Разница по подходам: «=·+1·+1» — 1-й без изменений, 2-й и 3-й на 1 больше</p>' : "";
+  $("progressBody").innerHTML = chart + list + hint;
 }
 
 /* ================= УПРАЖНЕНИЯ ================= */
