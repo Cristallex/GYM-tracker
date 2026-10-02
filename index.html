@@ -65,6 +65,22 @@
       <div id="progressBody"></div>
     </section>
 
+    <!-- ===== АДМИН-ПАНЕЛЬ (скрытая) ===== -->
+    <section id="screen-admin" class="screen">
+      <div class="card">
+        <div class="card-title">📦 NoSQL View — весь state из localStorage</div>
+        <pre id="adminJson" class="admin-json"></pre>
+      </div>
+      <div class="card">
+        <div class="card-title">🗂 SQL View — таблица «Тренировки»</div>
+        <div id="adminTableWorkouts" class="admin-table"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🗂 SQL View — таблица «Подходы»</div>
+        <div id="adminTableSets" class="admin-table"></div>
+      </div>
+    </section>
+
     <!-- ===== УПРАЖНЕНИЯ ===== -->
     <section id="screen-exercises" class="screen">
       <div class="row">
@@ -101,6 +117,7 @@
           <button id="btnExport" class="btn btn-outline btn-block">📤 Экспорт данных</button>
           <button id="btnImport" class="btn btn-outline btn-block">📥 Импорт данных</button>
           <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+          <button id="btnAdmin" class="btn btn-outline btn-block">🛠 Админ-панель</button>
         </div>
       </div>
     </div>

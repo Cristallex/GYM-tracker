@@ -556,6 +556,24 @@ input:focus, .select:focus { border-color: var(--accent); }
   flex-shrink: 0;
 }
 
+/* Админ-панель */
+.admin-json {
+  font-size: 11px;
+  font-family: ui-monospace, Consolas, monospace;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--rS);
+  padding: 10px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+}
+.admin-table { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tbl th, .tbl td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; }
+.tbl th { background: var(--card2); color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+
 /* Шапка активной тренировки + таймер */
 .active-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .active-head .btn-back { margin-bottom: 0; }

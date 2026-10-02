@@ -702,6 +702,39 @@ $("importFile").addEventListener("change", (e) => {
   rd.readAsText(f);
 });
 
+/* ================= АДМИН-ПАНЕЛЬ (секретная) ================= */
+
+$("btnAdmin").addEventListener("click", () => {
+  $("settingsModal").classList.add("hidden");
+  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+  $("screen-admin").classList.add("active");
+  $("screenTitle").textContent = "🛠 Админ-панель";
+  renderAdmin();
+});
+
+function renderAdmin() {
+  // NoSQL View: весь объект состояния как JSON
+  $("adminJson").textContent = JSON.stringify(state, null, 2);
+
+  // SQL View, таблица 1: тренировки
+  const wRows = state.workouts.map((w) =>
+    `<tr><td>${esc(w.id)}</td><td>${esc(fmtDate(w.dateISO))}</td><td>${esc(fmtDur(w.durationMin))}</td><td>${w.sauna && w.sauna.length ? w.sauna.length + " заход(а)" : "—"}</td></tr>`
+  ).join("");
+  $("adminTableWorkouts").innerHTML =
+    `<table class="tbl"><thead><tr><th>ID</th><th>Дата</th><th>Длит.</th><th>Сауна</th></tr></thead>` +
+    `<tbody>${wRows || '<tr><td colspan="4">пусто</td></tr>'}</tbody></table>`;
+
+  // SQL View, таблица 2: подходы (каждый подход — отдельная строка)
+  const sRows = [];
+  state.workouts.forEach((w) => w.entries.forEach((e) => e.sets.forEach((s) => {
+    sRows.push(`<tr><td>${esc(w.id)}</td><td>${esc(e.name)}</td><td>${isBw(e, s) ? "свой вес" : s.kg + " кг"}</td><td>${s.reps}</td></tr>`);
+  })));
+  $("adminTableSets").innerHTML =
+    `<table class="tbl"><thead><tr><th>ID трен.</th><th>Упражнение</th><th>Вес</th><th>Повт.</th></tr></thead>` +
+    `<tbody>${sRows.join("") || '<tr><td colspan="4">пусто</td></tr>'}</tbody></table>`;
+}
+
 /* --- PWA --- */
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
