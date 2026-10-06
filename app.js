@@ -454,7 +454,7 @@ window.delSet = (ei, si) => {
 };
 
 /* --- Перетаскивание подходов: удержание ~1.5с → вибрация → тянешь --- */
-const DRAG_HOLD_MS = 1500;
+const DRAG_HOLD_MS = 1000;
 let dragSet = null;
 
 window.setDragStart = (ev, ei, si) => {

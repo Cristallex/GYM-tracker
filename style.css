@@ -397,7 +397,7 @@ input:focus, .select:focus { border-color: var(--accent); }
 .hist-card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 
 /* Запланированная тренировка */
-.planned-card { border: 1px solid var(--accent); }
+.planned-card { border: 1px solid var(--accent); margin-top: 14px; }
 .planned-card.planned-today { box-shadow: 0 0 0 2px var(--accent) inset; }
 .plan-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .plan-row input {
