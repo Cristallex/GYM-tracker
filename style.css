@@ -259,6 +259,25 @@ main { padding: 8px 16px 16px; max-width: 520px; margin: 0 auto; overflow-x: hid
 .stepper .unit { font-size: 10px; color: var(--muted); font-weight: 400; }
 .set-del { background: none; border: none; color: var(--red); font-size: 15px; cursor: pointer; padding: 5px; }
 
+/* Ручка перетаскивания подхода */
+.drag-handle {
+  width: 28px; height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--rS);
+  background: var(--card2);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: grab;
+  flex-shrink: 0;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.set-row.dragging { opacity: .45; outline: 1px dashed var(--accent); outline-offset: -1px; border-radius: var(--rS); }
+.set-row.drop-target { box-shadow: 0 -3px 0 var(--accent); }
+.set-row.drop-target.drop-below { box-shadow: 0 3px 0 var(--accent); }
+
 /* Вес тела у подхода */
 .bw-mini {
   width: 28px; height: 34px;

@@ -286,7 +286,7 @@ function renderWorkout() {
         <button class="btn-danger btn" onclick="removeEntry(${ei})">✕</button>
       </div>
       ${e.sets.map((s, si) => `
-        <div class="set-row">
+        <div class="set-row" data-si="${si}">
           <span class="set-num">${si + 1}</span>
           ${s.bw
             ? `<button class="bw-pill" onclick="setBw(${ei},${si},0)" title="Нажми, чтобы вернуть кг">🤸 свой вес</button>`
@@ -301,6 +301,7 @@ function renderWorkout() {
             <input class="set-in" type="number" value="${s.reps}" min="0" step="1" inputmode="numeric" onchange="setVal(${ei},${si},'reps',this.value)"><span class="unit">раз</span>
             <button class="bump" onpointerdown="startBump(event,${ei},${si},'reps',1)" oncontextmenu="return false">+</button>
           </div>
+          <button class="drag-handle" onpointerdown="setDragStart(event,${ei},${si})" oncontextmenu="return false" title="Удерживай ~1.5 сек и перетащи">☰</button>
           <button class="set-del" onclick="delSet(${ei},${si})">✕</button>
         </div>`).join("")}
       <button class="btn btn-outline btn-block" onclick="addSet(${ei})">+ Подход</button>
@@ -376,6 +377,60 @@ window.delSet = (ei, si) => {
   state.draft.entries[ei].sets.splice(si, 1);
   save(); renderWorkout();
 };
+
+/* --- Перетаскивание подходов: удержание ~1.5с → вибрация → тянешь --- */
+const DRAG_HOLD_MS = 1500;
+let dragSet = null;
+
+window.setDragStart = (ev, ei, si) => {
+  ev.preventDefault();
+  dragSet = { ei, si, active: false, rowEl: ev.target.closest(".set-row"), overEl: null, after: false };
+  dragSet.timer = setTimeout(() => {
+    if (!dragSet) return;
+    dragSet.active = true;
+    if (navigator.vibrate) navigator.vibrate(40);
+    dragSet.rowEl.classList.add("dragging");
+  }, DRAG_HOLD_MS);
+  window.addEventListener("pointermove", setDragMove);
+  window.addEventListener("pointerup", setDragEnd, { once: true });
+  window.addEventListener("pointercancel", setDragEnd, { once: true });
+};
+
+function setDragMove(ev) {
+  if (!dragSet || !dragSet.active) return;
+  const el = document.elementFromPoint(ev.clientX, ev.clientY);
+  const row = el && el.closest(".set-row");
+  const card = dragSet.rowEl.parentElement; // перенос только внутри своего упражнения
+  if (dragSet.overEl && dragSet.overEl !== row) {
+    dragSet.overEl.classList.remove("drop-target", "drop-below");
+  }
+  if (row && row !== dragSet.rowEl && row.parentElement === card) {
+    const r = row.getBoundingClientRect();
+    dragSet.overEl = row;
+    dragSet.after = ev.clientY > r.top + r.height / 2; // вставить до или после строки
+    row.classList.add("drop-target");
+    row.classList.toggle("drop-below", dragSet.after);
+  } else {
+    dragSet.overEl = null;
+  }
+}
+
+function setDragEnd() {
+  window.removeEventListener("pointermove", setDragMove);
+  if (!dragSet) return;
+  clearTimeout(dragSet.timer);
+  const { active, ei, si, overEl, after } = dragSet;
+  if (active && overEl) {
+    const sets = state.draft.entries[ei].sets;
+    let to = +overEl.dataset.si + (after ? 1 : 0);
+    const [moved] = sets.splice(si, 1);
+    if (to > si) to--;
+    sets.splice(to, 0, moved);
+    save();
+  }
+  dragSet = null;
+  if (active) renderWorkout();
+}
 window.removeEntry = (ei) => {
   if (!confirm("Убрать упражнение?")) return;
   state.draft.entries.splice(ei, 1);
