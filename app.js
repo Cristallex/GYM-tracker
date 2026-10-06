@@ -268,6 +268,18 @@ function renderWorkout() {
         </div>`).join("")
     : "";
 
+  // Запланированная тренировка
+  const pl = state.planned;
+  const plToday = pl && pl.date === todayStr();
+  $("plannedCard").innerHTML = pl ? `
+    <div class="card hist-card planned-card${plToday ? " planned-today" : ""}" onclick="startPlanned()">
+      <div class="top">
+        <span class="hist-date">📅 ${esc(fmtDate(pl.date + "T12:00:00"))}${pl.time ? ", " + esc(pl.time) : ""}${plToday ? " — сегодня!" : ""}</span>
+        <button class="set-del" title="Убрать план" onclick="event.stopPropagation();delPlanned()">✕</button>
+      </div>
+      <div class="hist-ex">Нажми — начнётся тренировка по последней записи</div>
+    </div>` : "";
+
   if (!active) return;
 
   $("btnFinishWorkout").textContent = d.editId ? "💾 Сохранить изменения" : "✔ Завершить тренировку";
@@ -362,6 +374,69 @@ window.delTemplate = (id) => {
   save(); renderWorkout();
 };
 
+/* --- Планирование тренировки + событие в календарь --- */
+$("btnPlanWorkout").addEventListener("click", () => {
+  const tomorrow = new Date(Date.now() + 86400000);
+  $("planDate").value = dateStr(tomorrow);
+  $("planModal").classList.remove("hidden");
+});
+$("btnClosePlan").addEventListener("click", () => $("planModal").classList.add("hidden"));
+$("planModal").addEventListener("click", (e) => { if (e.target === $("planModal")) $("planModal").classList.add("hidden"); });
+
+$("btnPlanSave").addEventListener("click", () => {
+  const d = $("planDate").value;
+  if (!d) return;
+  const t = $("planTime").value || "18:00";
+  state.planned = { date: d, time: t };
+  save();
+  downloadIcs(d, t);
+  $("planModal").classList.add("hidden");
+  renderWorkout();
+});
+
+function downloadIcs(dateStrV, timeStr) {
+  const [Y, M, D] = dateStrV.split("-").map(Number);
+  const [h, m] = (timeStr || "18:00").split(":").map(Number);
+  const start = new Date(Y, M - 1, D, h, m);
+  const end = new Date(start.getTime() + 90 * 60000);
+  const p2 = (n) => String(n).padStart(2, "0");
+  const loc = (d) => `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}T${p2(d.getHours())}${p2(d.getMinutes())}00`;
+  const ics = [
+    "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//gym-tracker//RU",
+    "BEGIN:VEVENT",
+    `UID:${Date.now()}@gymtracker`,
+    `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
+    `DTSTART:${loc(start)}`,
+    `DTEND:${loc(end)}`,
+    "SUMMARY:🏋️ Тренировка",
+    "BEGIN:VALARM", "TRIGGER:-PT30M", "ACTION:DISPLAY", "DESCRIPTION:Время тренировки!", "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR",
+  ].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar" }));
+  a.download = "trenirovka.ics";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+window.startPlanned = () => {
+  const last = state.workouts.slice().sort((a, b) => new Date(b.dateISO) - new Date(a.dateISO))[0];
+  state.draft = {
+    entries: last ? JSON.parse(JSON.stringify(last.entries)) : [],
+    durH: 1, durM: 0,
+    startedAt: Date.now(),
+  };
+  state.planned = null;
+  showActive = true;
+  save(); renderWorkout();
+};
+
+window.delPlanned = () => {
+  state.planned = null;
+  save(); renderWorkout();
+};
+
 window.bump = (ei, si, field, delta) => {
   const s = state.draft.entries[ei].sets[si];
   s[field] = Math.max(0, s[field] + delta);
@@ -384,12 +459,15 @@ let dragSet = null;
 
 window.setDragStart = (ev, ei, si) => {
   ev.preventDefault();
-  dragSet = { ei, si, active: false, rowEl: ev.target.closest(".set-row"), overEl: null, after: false };
+  const rowEl = ev.target.closest(".set-row");
+  dragSet = { ei, si, active: false, rowEl, grabDY: 0, ty: 0 };
   dragSet.timer = setTimeout(() => {
     if (!dragSet) return;
     dragSet.active = true;
     if (navigator.vibrate) navigator.vibrate(40);
-    dragSet.rowEl.classList.add("dragging");
+    dragSet.grabDY = ev.clientY - rowEl.getBoundingClientRect().top;
+    rowEl.classList.add("dragging"); // плавное увеличение — transition в CSS
+    setTimeout(() => { if (dragSet) dragSet.rowEl.style.transition = "none"; }, 180); // дальше следует за пальцем без инерции
   }, DRAG_HOLD_MS);
   window.addEventListener("pointermove", setDragMove);
   window.addEventListener("pointerup", setDragEnd, { once: true });
@@ -398,38 +476,55 @@ window.setDragStart = (ev, ei, si) => {
 
 function setDragMove(ev) {
   if (!dragSet || !dragSet.active) return;
-  const el = document.elementFromPoint(ev.clientX, ev.clientY);
-  const row = el && el.closest(".set-row");
-  const card = dragSet.rowEl.parentElement; // перенос только внутри своего упражнения
-  if (dragSet.overEl && dragSet.overEl !== row) {
-    dragSet.overEl.classList.remove("drop-target", "drop-below");
+  const row = dragSet.rowEl;
+  const card = row.parentElement;
+
+  // строка едет за пальцем
+  const layoutTop = row.getBoundingClientRect().top - dragSet.ty;
+  dragSet.ty = ev.clientY - dragSet.grabDY - layoutTop;
+  row.style.transform = `translateY(${dragSet.ty}px) scale(1.03)`;
+
+  // вытеснение: над чем палец — та строка уступает место
+  const rows = [...card.querySelectorAll(".set-row")].filter((r) => r !== row);
+  let insertBeforeEl = null;
+  for (const r of rows) {
+    const rect = r.getBoundingClientRect();
+    if (ev.clientY < rect.top + rect.height / 2) { insertBeforeEl = r; break; }
   }
-  if (row && row !== dragSet.rowEl && row.parentElement === card) {
-    const r = row.getBoundingClientRect();
-    dragSet.overEl = row;
-    dragSet.after = ev.clientY > r.top + r.height / 2; // вставить до или после строки
-    row.classList.add("drop-target");
-    row.classList.toggle("drop-below", dragSet.after);
-  } else {
-    dragSet.overEl = null;
-  }
+  const needMove = insertBeforeEl ? row.nextElementSibling !== insertBeforeEl : !!row.nextElementSibling;
+  if (!needMove) return;
+
+  const before = new Map(rows.map((r) => [r, r.getBoundingClientRect().top]));
+  card.insertBefore(row, insertBeforeEl); // DOM-порядок становится новым порядком
+  rows.forEach((r) => { // соседи плавно доезжают до новых мест
+    const dy = before.get(r) - r.getBoundingClientRect().top;
+    if (!dy) return;
+    r.style.transition = "none";
+    r.style.transform = `translateY(${dy}px)`;
+    requestAnimationFrame(() => {
+      r.style.transition = "transform .15s ease";
+      r.style.transform = "";
+    });
+  });
+
+  // после перестановки пересчитываем сдвиг от нового layout-слота
+  const lt = row.getBoundingClientRect().top - dragSet.ty;
+  dragSet.ty = ev.clientY - dragSet.grabDY - lt;
+  row.style.transform = `translateY(${dragSet.ty}px) scale(1.03)`;
 }
 
 function setDragEnd() {
   window.removeEventListener("pointermove", setDragMove);
   if (!dragSet) return;
   clearTimeout(dragSet.timer);
-  const { active, ei, si, overEl, after } = dragSet;
-  if (active && overEl) {
-    const sets = state.draft.entries[ei].sets;
-    let to = +overEl.dataset.si + (after ? 1 : 0);
-    const [moved] = sets.splice(si, 1);
-    if (to > si) to--;
-    sets.splice(to, 0, moved);
-    save();
+  const { active, ei, rowEl } = dragSet;
+  if (active) {
+    const entry = state.draft.entries[ei];
+    const order = [...rowEl.parentElement.querySelectorAll(".set-row")].map((r) => +r.dataset.si);
+    entry.sets = order.map((i) => entry.sets[i]); // DOM-порядок уже новый — собираем по data-si
+    save(); renderWorkout();
   }
   dragSet = null;
-  if (active) renderWorkout();
 }
 window.removeEntry = (ei) => {
   if (!confirm("Убрать упражнение?")) return;

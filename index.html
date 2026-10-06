@@ -22,7 +22,9 @@
         <p class="idle-text">Готов к тренировке?</p>
         <button id="btnStartWorkout" class="btn btn-primary btn-big">Добавить тренировку</button>
         <button id="btnDiscardWorkout" class="btn btn-text-danger hidden">Отменить тренировку</button>
+        <div id="plannedCard"></div>
         <div id="templates"></div>
+        <button id="btnPlanWorkout" class="btn btn-outline btn-block">📅 Запланировать тренировку</button>
       </div>
 
       <div id="workoutActive" class="hidden">
@@ -119,6 +121,24 @@
           <input type="file" id="importFile" accept="application/json,.json" class="hidden">
           <button id="btnAdmin" class="btn btn-outline btn-block">🛠 Админ-панель</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка планирования тренировки -->
+  <div id="planModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <strong>📅 Запланировать тренировку</strong>
+        <button id="btnClosePlan" class="btn btn-small">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="plan-row">
+          <input type="date" id="planDate">
+          <input type="time" id="planTime" value="18:00">
+        </div>
+        <button id="btnPlanSave" class="btn btn-primary btn-block">Сохранить и добавить в календарь</button>
+        <p class="plan-hint">Скачается файл события — открой его и нажми «Сохранить» в календаре. Напомнит сам календарь телефона.</p>
       </div>
     </div>
   </div>
