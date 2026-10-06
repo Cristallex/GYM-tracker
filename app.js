@@ -131,18 +131,33 @@ const todayStr = () => dateStr(new Date());
 /* --- Навигация по вкладкам --- */
 const TITLES = { workout: "🏋️ Зал", history: "📋 История", progress: "📈 Прогресс", exercises: "💪 Упражнения" };
 
+const SCROLLS = {}; // позиция скролла каждой вкладки
+let currentScreen = "workout";
+
+window.addEventListener("scroll", () => { SCROLLS[currentScreen] = window.scrollY; }, { passive: true });
+
 document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
     document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
     tab.classList.add("active");
     const name = tab.dataset.screen;
+    currentScreen = name;
     $("screen-" + name).classList.add("active");
     $("screenTitle").textContent = TITLES[name];
     if (name === "history") renderHistory();
     if (name === "progress") renderProgress();
     if (name === "exercises") renderExercises();
+    window.scrollTo(0, SCROLLS[name] || 0); // вернуться туда, где остановились
   });
+});
+
+// запоминаем скролл тренировки при сворачивании — переживёт перезапуск приложения
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && state.draft && currentScreen === "workout") {
+    state.draft.scrollY = window.scrollY;
+    save();
+  }
 });
 
 /* ================= ТРЕНИРОВКА ================= */
@@ -708,9 +723,11 @@ $("btnAdmin").addEventListener("click", () => {
   $("settingsModal").classList.add("hidden");
   document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+  currentScreen = "admin";
   $("screen-admin").classList.add("active");
   $("screenTitle").textContent = "🛠 Админ-панель";
   renderAdmin();
+  window.scrollTo(0, 0);
 });
 
 function renderAdmin() {
@@ -743,3 +760,4 @@ if ("serviceWorker" in navigator) {
 applyTheme();
 showActive = !!state.draft; // незавершённая тренировка открывается сразу
 renderWorkout();
+if (state.draft && state.draft.scrollY) window.scrollTo(0, state.draft.scrollY);
