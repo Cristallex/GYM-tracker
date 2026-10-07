@@ -374,25 +374,62 @@ window.delTemplate = (id) => {
   save(); renderWorkout();
 };
 
-/* --- Планирование тренировки + событие в календарь --- */
+/* --- Планирование тренировки + событие в календарь/уведомление --- */
+const isNativeApp = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const PLANNED_NOTIF_ID = 9001;
+
 $("btnPlanWorkout").addEventListener("click", () => {
   const tomorrow = new Date(Date.now() + 86400000);
   $("planDate").value = dateStr(tomorrow);
+  if (isNativeApp()) {
+    $("btnPlanSave").textContent = "Сохранить напоминание";
+    $("planHint").textContent = "В нужный день приложение пришлёт уведомление само.";
+  }
   $("planModal").classList.remove("hidden");
 });
 $("btnClosePlan").addEventListener("click", () => $("planModal").classList.add("hidden"));
 $("planModal").addEventListener("click", (e) => { if (e.target === $("planModal")) $("planModal").classList.add("hidden"); });
 
-$("btnPlanSave").addEventListener("click", () => {
+$("btnPlanSave").addEventListener("click", async () => {
   const d = $("planDate").value;
   if (!d) return;
   const t = $("planTime").value || "18:00";
   state.planned = { date: d, time: t };
   save();
-  downloadIcs(d, t);
+  if (isNativeApp()) {
+    await planNativeReminder(d, t);
+  } else {
+    downloadIcs(d, t);
+  }
   $("planModal").classList.add("hidden");
   renderWorkout();
 });
+
+async function planNativeReminder(dateStrV, timeStr) {
+  try {
+    const LN = window.Capacitor.Plugins.LocalNotifications;
+    const perm = await LN.requestPermissions();
+    if (perm.display !== "granted") {
+      alert("Уведомления выключены — разреши их в настройках приложения, чтобы получать напоминания.");
+      return;
+    }
+    const [Y, M, D] = dateStrV.split("-").map(Number);
+    const [h, m] = (timeStr || "18:00").split(":").map(Number);
+    await LN.cancel({ notifications: [{ id: PLANNED_NOTIF_ID }] }).catch(() => {});
+    await LN.schedule({ notifications: [{
+      id: PLANNED_NOTIF_ID,
+      title: "🏋️ Тренировка",
+      body: "Время тренировки — за работу!",
+      schedule: { at: new Date(Y, M - 1, D, h, m), allowWhileIdle: true },
+    }] });
+  } catch (e) {}
+}
+
+async function cancelPlanNativeReminder() {
+  try {
+    if (isNativeApp()) await window.Capacitor.Plugins.LocalNotifications.cancel({ notifications: [{ id: PLANNED_NOTIF_ID }] });
+  } catch (e) {}
+}
 
 function downloadIcs(dateStrV, timeStr) {
   const [Y, M, D] = dateStrV.split("-").map(Number);
@@ -428,12 +465,14 @@ window.startPlanned = () => {
     startedAt: Date.now(),
   };
   state.planned = null;
+  cancelPlanNativeReminder();
   showActive = true;
   save(); renderWorkout();
 };
 
 window.delPlanned = () => {
   state.planned = null;
+  cancelPlanNativeReminder();
   save(); renderWorkout();
 };
 
@@ -457,6 +496,14 @@ window.delSet = (ei, si) => {
 const DRAG_HOLD_MS = 1000;
 let dragSet = null;
 
+function buzz() {
+  try {
+    const H = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
+    if (H) { H.impact({ style: "MEDIUM" }); return; }
+  } catch (e) {}
+  if (navigator.vibrate) navigator.vibrate(40); // в браузере
+}
+
 window.setDragStart = (ev, ei, si) => {
   ev.preventDefault();
   const rowEl = ev.target.closest(".set-row");
@@ -464,7 +511,7 @@ window.setDragStart = (ev, ei, si) => {
   dragSet.timer = setTimeout(() => {
     if (!dragSet) return;
     dragSet.active = true;
-    if (navigator.vibrate) navigator.vibrate(40);
+    buzz();
     dragSet.grabDY = ev.clientY - rowEl.getBoundingClientRect().top;
     rowEl.classList.add("dragging"); // плавное увеличение — transition в CSS
     setTimeout(() => { if (dragSet) dragSet.rowEl.style.transition = "none"; }, 180); // дальше следует за пальцем без инерции
