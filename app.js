@@ -152,49 +152,62 @@ document.querySelectorAll(".tab").forEach((tab) => {
   });
 });
 
-// запоминаем скролл тренировки при сворачивании — переживёт перезапуск приложения
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden" && state.draft && currentScreen === "workout") {
-    state.draft.scrollY = window.scrollY;
-    save();
-  }
-});
-
 /* ================= ТРЕНИРОВКА ================= */
 
 let showActive = false; // показывать ли экран активной тренировки
+let editingKind = "main"; // "main" | "mini" — какой черновик открыт в редакторе
+const curDraft = () => (editingKind === "mini" ? state.miniDraft : state.draft);
+const setDraft = (d) => { if (editingKind === "mini") state.miniDraft = d; else state.draft = d; };
 
-$("btnStartWorkout").addEventListener("click", () => {
-  if (!state.draft) {
-    state.draft = { entries: [], durH: 1, durM: 0, startedAt: Date.now() };
-    save();
-  } else if (!state.draft.startedAt && !state.draft.editId) {
-    state.draft.startedAt = Date.now(); // старый черновик без таймера — включаем сейчас
+// запоминаем скролл тренировки при сворачивании — переживёт перезапуск приложения
+document.addEventListener("visibilitychange", () => {
+  const dd = curDraft();
+  if (document.visibilityState === "hidden" && dd && currentScreen === "workout" && showActive) {
+    dd.scrollY = window.scrollY;
     save();
   }
-  showActive = true;
-  renderWorkout();
 });
+
+function openDraft(kind) {
+  editingKind = kind;
+  state.activeKind = kind;
+  let d = curDraft();
+  if (!d) {
+    setDraft({ entries: [], durH: 1, durM: 0, startedAt: Date.now() });
+  } else if (!d.startedAt && !d.editId) {
+    d.startedAt = Date.now(); // старый черновик без таймера — включаем сейчас
+  }
+  showActive = true;
+  save();
+  renderWorkout();
+}
+
+$("btnStartWorkout").addEventListener("click", () => openDraft("main"));
+$("btnStartMini").addEventListener("click", () => openDraft("mini"));
 
 $("btnBackWorkout").addEventListener("click", () => {
   showActive = false; // черновик остаётся — можно продолжить позже
   renderWorkout();
 });
 
-$("btnDiscardWorkout").addEventListener("click", () => {
+$("btnDiscardWorkout").addEventListener("click", () => discardDraft("main"));
+$("btnDiscardMini").addEventListener("click", () => discardDraft("mini"));
+
+function discardDraft(kind) {
   if (!confirm("Удалить эту тренировку? Всё заполненное пропадёт.")) return;
-  state.draft = null;
+  editingKind = kind;
+  setDraft(null);
   showActive = false;
   save();
   renderWorkout();
-});
+}
 
 $("btnFinishWorkout").addEventListener("click", () => {
-  const d = state.draft;
+  const d = curDraft();
   if (!d) return;
   if (!d.entries.length) {
     if (!confirm("Тренировка пустая. Завершить без записи?")) return;
-    state.draft = null; save(); renderWorkout(); return;
+    setDraft(null); save(); renderWorkout(); return;
   }
   if (!confirm(d.editId ? "Сохранить изменения?" : "Завершить и сохранить тренировку?")) return;
   // автодлительность из таймера; если пользователь правил поля руками — уважаем его ввод
@@ -208,25 +221,25 @@ $("btnFinishWorkout").addEventListener("click", () => {
   };
   if (d.editId) {
     const w = state.workouts.find((x) => x.id === d.editId);
-    if (w) Object.assign(w, data);
+    if (w) Object.assign(w, data); // тип (мини/обычная) сохраняется
   } else {
-    state.workouts.unshift({ id: "w" + Date.now(), dateISO: new Date().toISOString(), ...data });
+    state.workouts.unshift({ id: "w" + Date.now(), dateISO: new Date().toISOString(), mini: editingKind === "mini", ...data });
   }
-  state.draft = null;
+  setDraft(null);
   showActive = false;
   save();
   renderWorkout();
 });
 
-$("durH").addEventListener("input", (e) => { state.draft.durH = e.target.value; state.draft.durTouched = true; save(); });
-$("durM").addEventListener("input", (e) => { state.draft.durM = e.target.value; state.draft.durTouched = true; save(); });
-$("wDate").addEventListener("input", (e) => { state.draft.wDate = e.target.value; save(); });
+$("durH").addEventListener("input", (e) => { const dd = curDraft(); if (!dd) return; dd.durH = e.target.value; dd.durTouched = true; save(); });
+$("durM").addEventListener("input", (e) => { const dd = curDraft(); if (!dd) return; dd.durM = e.target.value; dd.durTouched = true; save(); });
+$("wDate").addEventListener("input", (e) => { const dd = curDraft(); if (!dd) return; dd.wDate = e.target.value; save(); });
 
 /* --- Таймер тренировки --- */
 let workoutTicker = null;
 
 function tickWorkout() {
-  const d = state.draft;
+  const d = curDraft();
   if (!d || !d.startedAt || d.editId) return stopWorkoutTick();
   const sec = Math.max(0, Math.floor((Date.now() - d.startedAt) / 1000));
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
@@ -242,43 +255,53 @@ function tickWorkout() {
 function startWorkoutTick() { stopWorkoutTick(); tickWorkout(); workoutTicker = setInterval(tickWorkout, 1000); }
 function stopWorkoutTick() { clearInterval(workoutTicker); workoutTicker = null; }
 
+function tmplHtml(list, kind) {
+  return list && list.length
+    ? `<div class="pick-group">Шаблоны</div>` +
+      list.map((t) => `
+        <div class="card hist-card" onclick="startFromTemplate('${t.id}','${kind}')">
+          <div class="top">
+            <span class="hist-date">📄 ${esc(t.name)}</span>
+            <button class="set-del" title="Удалить шаблон" onclick="event.stopPropagation();delTemplate('${t.id}','${kind}')">✕</button>
+          </div>
+          <div class="hist-ex">${t.entries.length} упр.: ${esc(t.entries.slice(0, 3).map((e) => e.name).join(", "))}${t.entries.length > 3 ? "…" : ""}</div>
+        </div>`).join("")
+    : "";
+}
+
+function plannedHtml(pl, kind) {
+  const plToday = pl && pl.date === todayStr();
+  return pl ? `
+    <div class="card hist-card planned-card${plToday ? " planned-today" : ""}" onclick="startPlanned('${kind}')">
+      <div class="top">
+        <span class="hist-date">📅 ${esc(fmtDate(pl.date + "T12:00:00"))}${pl.time ? ", " + esc(pl.time) : ""}${plToday ? " — сегодня!" : ""}</span>
+        <button class="set-del" title="Убрать план" onclick="event.stopPropagation();delPlanned('${kind}')">✕</button>
+      </div>
+      <div class="hist-ex">Нажми — начнётся ${kind === "mini" ? "мини-тренировка" : "тренировка"} по последней записи</div>
+    </div>` : "";
+}
+
 function renderWorkout() {
-  const d = state.draft;
+  const d = curDraft();
   const active = !!(d && showActive);
   $("workoutIdle").classList.toggle("hidden", active);
   $("workoutActive").classList.toggle("hidden", !active);
-  $("btnStartWorkout").textContent = d ? "Продолжить тренировку" : "Добавить тренировку";
-  $("btnDiscardWorkout").classList.toggle("hidden", !d);
+  $("btnStartWorkout").textContent = state.draft ? "Продолжить тренировку" : "Добавить тренировку";
+  $("btnDiscardWorkout").classList.toggle("hidden", !state.draft);
+  $("btnStartMini").textContent = state.miniDraft ? "Продолжить мини-тренировку" : "Добавить мини-тренировку";
+  $("btnDiscardMini").classList.toggle("hidden", !state.miniDraft);
+  $("kindTag").classList.toggle("hidden", !(active && editingKind === "mini"));
 
   // чип таймера — только в новой тренировке (в редактировании не показываем)
   const hasTimer = !!(active && d.startedAt && !d.editId);
   $("workoutTimer").classList.toggle("hidden", !hasTimer);
   if (hasTimer) startWorkoutTick(); else stopWorkoutTick();
 
-  // Шаблоны на стартовом экране
-  $("templates").innerHTML = state.templates.length
-    ? `<div class="pick-group">Шаблоны</div>` +
-      state.templates.map((t) => `
-        <div class="card hist-card" onclick="startFromTemplate('${t.id}')">
-          <div class="top">
-            <span class="hist-date">📄 ${esc(t.name)}</span>
-            <button class="set-del" title="Удалить шаблон" onclick="event.stopPropagation();delTemplate('${t.id}')">✕</button>
-          </div>
-          <div class="hist-ex">${t.entries.length} упр.: ${esc(t.entries.slice(0, 3).map((e) => e.name).join(", "))}${t.entries.length > 3 ? "…" : ""}</div>
-        </div>`).join("")
-    : "";
-
-  // Запланированная тренировка
-  const pl = state.planned;
-  const plToday = pl && pl.date === todayStr();
-  $("plannedCard").innerHTML = pl ? `
-    <div class="card hist-card planned-card${plToday ? " planned-today" : ""}" onclick="startPlanned()">
-      <div class="top">
-        <span class="hist-date">📅 ${esc(fmtDate(pl.date + "T12:00:00"))}${pl.time ? ", " + esc(pl.time) : ""}${plToday ? " — сегодня!" : ""}</span>
-        <button class="set-del" title="Убрать план" onclick="event.stopPropagation();delPlanned()">✕</button>
-      </div>
-      <div class="hist-ex">Нажми — начнётся тренировка по последней записи</div>
-    </div>` : "";
+  // Шаблоны и план — отдельно для основных и мини
+  $("templates").innerHTML = tmplHtml(state.templates, "main");
+  $("miniTemplates").innerHTML = tmplHtml(state.miniTemplates, "mini");
+  $("plannedCard").innerHTML = plannedHtml(state.planned, "main");
+  $("plannedMiniCard").innerHTML = plannedHtml(state.miniPlanned, "mini");
 
   if (!active) return;
 
@@ -321,12 +344,12 @@ function renderWorkout() {
 }
 
 window.setVal = (ei, si, field, v) => {
-  const s = state.draft.entries[ei].sets[si];
+  const s = curDraft().entries[ei].sets[si];
   s[field] = Math.max(0, parseFloat(v) || 0);
   save();
 };
 window.setBw = (ei, si, on) => {
-  state.draft.entries[ei].sets[si].bw = !!on;
+  curDraft().entries[ei].sets[si].bw = !!on;
   save(); renderWorkout();
 };
 
@@ -344,11 +367,12 @@ document.addEventListener("pointercancel", stopBump);
 
 /* --- Шаблоны тренировок --- */
 $("btnSaveTemplate").addEventListener("click", () => {
-  const d = state.draft;
+  const d = curDraft();
   if (!d || !d.entries.length) { alert("Сначала добавь упражнения — шаблон из пустой тренировки не сохранить."); return; }
-  const name = prompt("Название шаблона:", "Моя тренировка");
+  const name = prompt("Название шаблона:", editingKind === "mini" ? "Моя мини-тренировка" : "Моя тренировка");
   if (!name || !name.trim()) return;
-  state.templates.push({
+  const list = editingKind === "mini" ? (state.miniTemplates = state.miniTemplates || []) : state.templates;
+  list.push({
     id: "t" + Date.now(),
     name: name.trim(),
     entries: JSON.parse(JSON.stringify(d.entries)),
@@ -356,29 +380,35 @@ $("btnSaveTemplate").addEventListener("click", () => {
   save(); renderWorkout();
 });
 
-window.startFromTemplate = (id) => {
-  const t = state.templates.find((x) => x.id === id);
+window.startFromTemplate = (id, kind = "main") => {
+  const list = kind === "mini" ? (state.miniTemplates || []) : state.templates;
+  const t = list.find((x) => x.id === id);
   if (!t) return;
-  state.draft = {
+  editingKind = kind;
+  state.activeKind = kind;
+  setDraft({
     entries: JSON.parse(JSON.stringify(t.entries)),
     durH: 1, durM: 0,
     startedAt: Date.now(),
-  };
+  });
   showActive = true;
   save(); renderWorkout();
 };
 
-window.delTemplate = (id) => {
+window.delTemplate = (id, kind = "main") => {
   if (!confirm("Удалить шаблон?")) return;
-  state.templates = state.templates.filter((t) => t.id !== id);
+  if (kind === "mini") state.miniTemplates = (state.miniTemplates || []).filter((t) => t.id !== id);
+  else state.templates = state.templates.filter((t) => t.id !== id);
   save(); renderWorkout();
 };
 
 /* --- Планирование тренировки + событие в календарь/уведомление --- */
 const isNativeApp = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-const PLANNED_NOTIF_ID = 9001;
+const notifIdFor = (kind) => (kind === "mini" ? 9002 : 9001);
+let planKind = "main"; // для какой тренировки открыта модалка планирования
 
-$("btnPlanWorkout").addEventListener("click", () => {
+function openPlanModal(kind) {
+  planKind = kind;
   const tomorrow = new Date(Date.now() + 86400000);
   $("planDate").value = dateStr(tomorrow);
   if (isNativeApp()) {
@@ -386,7 +416,9 @@ $("btnPlanWorkout").addEventListener("click", () => {
     $("planHint").textContent = "В нужный день приложение пришлёт уведомление само.";
   }
   $("planModal").classList.remove("hidden");
-});
+}
+$("btnPlanWorkout").addEventListener("click", () => openPlanModal("main"));
+$("btnPlanMini").addEventListener("click", () => openPlanModal("mini"));
 $("btnClosePlan").addEventListener("click", () => $("planModal").classList.add("hidden"));
 $("planModal").addEventListener("click", (e) => { if (e.target === $("planModal")) $("planModal").classList.add("hidden"); });
 
@@ -394,10 +426,11 @@ $("btnPlanSave").addEventListener("click", async () => {
   const d = $("planDate").value;
   if (!d) return;
   const t = $("planTime").value || "18:00";
-  state.planned = { date: d, time: t };
+  if (planKind === "mini") state.miniPlanned = { date: d, time: t };
+  else state.planned = { date: d, time: t };
   save();
   if (isNativeApp()) {
-    await planNativeReminder(d, t);
+    await planNativeReminder(d, t, planKind);
   } else {
     downloadIcs(d, t);
   }
@@ -405,7 +438,7 @@ $("btnPlanSave").addEventListener("click", async () => {
   renderWorkout();
 });
 
-async function planNativeReminder(dateStrV, timeStr) {
+async function planNativeReminder(dateStrV, timeStr, kind = "main") {
   try {
     const LN = window.Capacitor.Plugins.LocalNotifications;
     const perm = await LN.requestPermissions();
@@ -415,19 +448,20 @@ async function planNativeReminder(dateStrV, timeStr) {
     }
     const [Y, M, D] = dateStrV.split("-").map(Number);
     const [h, m] = (timeStr || "18:00").split(":").map(Number);
-    await LN.cancel({ notifications: [{ id: PLANNED_NOTIF_ID }] }).catch(() => {});
+    const id = notifIdFor(kind);
+    await LN.cancel({ notifications: [{ id }] }).catch(() => {});
     await LN.schedule({ notifications: [{
-      id: PLANNED_NOTIF_ID,
-      title: "🏋️ Тренировка",
+      id,
+      title: kind === "mini" ? "⚡ Мини-тренировка" : "🏋️ Тренировка",
       body: "Время тренировки — за работу!",
       schedule: { at: new Date(Y, M - 1, D, h, m), allowWhileIdle: true },
     }] });
   } catch (e) {}
 }
 
-async function cancelPlanNativeReminder() {
+async function cancelPlanNativeReminder(kind = "main") {
   try {
-    if (isNativeApp()) await window.Capacitor.Plugins.LocalNotifications.cancel({ notifications: [{ id: PLANNED_NOTIF_ID }] });
+    if (isNativeApp()) await window.Capacitor.Plugins.LocalNotifications.cancel({ notifications: [{ id: notifIdFor(kind) }] });
   } catch (e) {}
 }
 
@@ -457,38 +491,41 @@ function downloadIcs(dateStrV, timeStr) {
   a.remove();
 }
 
-window.startPlanned = () => {
-  const last = state.workouts.slice().sort((a, b) => new Date(b.dateISO) - new Date(a.dateISO))[0];
-  state.draft = {
+window.startPlanned = (kind = "main") => {
+  const mini = kind === "mini";
+  const last = state.workouts.filter((w) => !!w.mini === mini).sort((a, b) => new Date(b.dateISO) - new Date(a.dateISO))[0];
+  editingKind = kind;
+  state.activeKind = kind;
+  setDraft({
     entries: last ? JSON.parse(JSON.stringify(last.entries)) : [],
     durH: 1, durM: 0,
     startedAt: Date.now(),
-  };
-  state.planned = null;
-  cancelPlanNativeReminder();
+  });
+  if (mini) state.miniPlanned = null; else state.planned = null;
+  cancelPlanNativeReminder(kind);
   showActive = true;
   save(); renderWorkout();
 };
 
-window.delPlanned = () => {
-  state.planned = null;
-  cancelPlanNativeReminder();
+window.delPlanned = (kind = "main") => {
+  if (kind === "mini") state.miniPlanned = null; else state.planned = null;
+  cancelPlanNativeReminder(kind);
   save(); renderWorkout();
 };
 
 window.bump = (ei, si, field, delta) => {
-  const s = state.draft.entries[ei].sets[si];
+  const s = curDraft().entries[ei].sets[si];
   s[field] = Math.max(0, s[field] + delta);
   save(); renderWorkout();
 };
 window.addSet = (ei) => {
-  const sets = state.draft.entries[ei].sets;
+  const sets = curDraft().entries[ei].sets;
   const last = sets[sets.length - 1];
   sets.push({ kg: last ? last.kg : 20, reps: last ? last.reps : 10, bw: last ? !!last.bw : false });
   save(); renderWorkout();
 };
 window.delSet = (ei, si) => {
-  state.draft.entries[ei].sets.splice(si, 1);
+  curDraft().entries[ei].sets.splice(si, 1);
   save(); renderWorkout();
 };
 
@@ -566,7 +603,7 @@ function setDragEnd() {
   clearTimeout(dragSet.timer);
   const { active, ei, rowEl } = dragSet;
   if (active) {
-    const entry = state.draft.entries[ei];
+    const entry = curDraft().entries[ei];
     const order = [...rowEl.parentElement.querySelectorAll(".set-row")].map((r) => +r.dataset.si);
     entry.sets = order.map((i) => entry.sets[i]); // DOM-порядок уже новый — собираем по data-si
     save(); renderWorkout();
@@ -575,7 +612,7 @@ function setDragEnd() {
 }
 window.removeEntry = (ei) => {
   if (!confirm("Убрать упражнение?")) return;
-  state.draft.entries.splice(ei, 1);
+  curDraft().entries.splice(ei, 1);
   save(); renderWorkout();
 };
 
@@ -652,7 +689,7 @@ function addEntry(ex) {
     const prev = w.entries.find((e) => e.name === ex.name);
     if (prev && prev.sets.length) { first = { ...prev.sets[prev.sets.length - 1] }; break; }
   }
-  state.draft.entries.push({ exerciseId: ex.id, name: ex.name, group: ex.group, sets: [first] });
+  curDraft().entries.push({ exerciseId: ex.id, name: ex.name, group: ex.group, sets: [first] });
   save();
   $("pickerModal").classList.add("hidden");
   renderWorkout();
@@ -663,7 +700,7 @@ function addEntry(ex) {
 function renderHistory() {
   const w = [...state.workouts].sort((a, b) => new Date(b.dateISO) - new Date(a.dateISO));
   $("historyList").innerHTML = w.length ? w.map((x) => {
-    const badges = [x.warmup && "🔥 разминка", x.stretch && "🧘 растяжка"].filter(Boolean);
+    const badges = [x.mini && "⚡ мини-тренировка", x.warmup && "🔥 разминка", x.stretch && "🧘 растяжка"].filter(Boolean);
     return `
       <div class="card hist-card" onclick="showDetail('${x.id}')">
         <div class="top">
@@ -687,7 +724,7 @@ window.showDetail = (id) => {
   if (!w) return;
   $("detailTitle").textContent = new Date(w.dateISO).toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "short" });
   $("detailBody").innerHTML =
-    `<p class="card-sub">Длительность: ${fmtDur(w.durationMin)}</p>` +
+    `<p class="card-sub">${w.mini ? "⚡ Мини-тренировка · " : ""}Длительность: ${fmtDur(w.durationMin)}</p>` +
     w.entries.map((e) => `
       <div class="det-ex">
         <div class="n">${esc(e.name)}</div>
@@ -701,13 +738,15 @@ window.showDetail = (id) => {
 window.editWorkout = (id) => {
   const w = state.workouts.find((x) => x.id === id);
   if (!w) return;
-  state.draft = {
+  editingKind = w.mini ? "mini" : "main";
+  state.activeKind = editingKind;
+  setDraft({
     entries: JSON.parse(JSON.stringify(w.entries)),
     durH: Math.floor((w.durationMin || 0) / 60),
     durM: (w.durationMin || 0) % 60,
     wDate: dateStr(new Date(w.dateISO)),
     editId: id,
-  };
+  });
   $("detailModal").classList.add("hidden");
   showActive = true;
   save();
@@ -723,14 +762,19 @@ const isBw = (e, s) => (s.bw !== undefined ? !!s.bw : !!e.bw);
 
 /* ================= ПРОГРЕСС ================= */
 
+let progressMini = false; // какой список показывает экран прогресса
+$("segMain").addEventListener("click", () => { progressMini = false; $("segMain").classList.add("active"); $("segMini").classList.remove("active"); renderProgress(); });
+$("segMini").addEventListener("click", () => { progressMini = true; $("segMini").classList.add("active"); $("segMain").classList.remove("active"); renderProgress(); });
+
 function renderProgress() {
+  const ws = state.workouts.filter((w) => !!w.mini === progressMini);
   const seen = new Map();
-  state.workouts.forEach((w) => w.entries.forEach((e) => { if (!seen.has(e.name)) seen.set(e.name, e); }));
+  ws.forEach((w) => w.entries.forEach((e) => { if (!seen.has(e.name)) seen.set(e.name, e); }));
   const names = [...seen.keys()];
 
   if (!names.length) {
     $("progressSelect").innerHTML = "";
-    $("progressBody").innerHTML = '<p class="empty">После первых тренировок здесь появится прогресс по каждому упражнению.</p>';
+    $("progressBody").innerHTML = `<p class="empty">${progressMini ? "Пока нет мини-тренировок." : "После первых тренировок здесь появится прогресс по каждому упражнению."}</p>`;
     return;
   }
 
@@ -787,7 +831,7 @@ const setsDiff = (prev, cur) => {
 function renderProgressBody() {
   const name = $("progressSelect").value;
   const rows = [];
-  [...state.workouts].sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO)).forEach((w) => {
+  state.workouts.filter((w) => !!w.mini === progressMini).sort((a, b) => new Date(a.dateISO) - new Date(b.dateISO)).forEach((w) => {
     w.entries.forEach((e) => {
       if (e.name !== name) return;
       const dd = new Date(w.dateISO);
@@ -933,11 +977,11 @@ function renderAdmin() {
 
   // SQL View, таблица 1: тренировки
   const wRows = state.workouts.map((w) =>
-    `<tr><td>${esc(w.id)}</td><td>${esc(fmtDate(w.dateISO))}</td><td>${esc(fmtDur(w.durationMin))}</td><td>${w.sauna && w.sauna.length ? w.sauna.length + " заход(а)" : "—"}</td></tr>`
+    `<tr><td>${esc(w.id)}</td><td>${w.mini ? "⚡ мини" : "обычная"}</td><td>${esc(fmtDate(w.dateISO))}</td><td>${esc(fmtDur(w.durationMin))}</td><td>${w.sauna && w.sauna.length ? w.sauna.length + " заход(а)" : "—"}</td></tr>`
   ).join("");
   $("adminTableWorkouts").innerHTML =
-    `<table class="tbl"><thead><tr><th>ID</th><th>Дата</th><th>Длит.</th><th>Сауна</th></tr></thead>` +
-    `<tbody>${wRows || '<tr><td colspan="4">пусто</td></tr>'}</tbody></table>`;
+    `<table class="tbl"><thead><tr><th>ID</th><th>Тип</th><th>Дата</th><th>Длит.</th><th>Сауна</th></tr></thead>` +
+    `<tbody>${wRows || '<tr><td colspan="5">пусто</td></tr>'}</tbody></table>`;
 
   // SQL View, таблица 2: подходы (каждый подход — отдельная строка)
   const sRows = [];
@@ -955,6 +999,9 @@ if ("serviceWorker" in navigator) {
 }
 
 applyTheme();
-showActive = !!state.draft; // незавершённая тренировка открывается сразу
+// восстанавливаем, какой черновик был открыт (мини или основной)
+editingKind = state.activeKind === "mini" && state.miniDraft ? "mini" : state.draft ? "main" : state.miniDraft ? "mini" : "main";
+showActive = !!curDraft(); // незавершённая тренировка открывается сразу
 renderWorkout();
-if (state.draft && state.draft.scrollY) window.scrollTo(0, state.draft.scrollY);
+const dd = curDraft();
+if (dd && dd.scrollY) window.scrollTo(0, dd.scrollY);

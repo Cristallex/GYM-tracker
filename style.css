@@ -139,9 +139,27 @@ main { padding: 8px 16px 16px; max-width: 520px; margin: 0 auto; overflow-x: hid
 .screen.active { display: block; animation: fade .18s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
 
-.idle { text-align: center; padding: 70px 0; }
-.idle-emoji { font-size: 52px; margin-bottom: 10px; }
+.idle { text-align: center; padding: 24px 0; }
+.idle-emoji { font-size: 38px; margin-bottom: 12px; }
 .idle-text { color: var(--muted); margin-bottom: 24px; font-size: 17px; }
+
+/* Разделение основной и мини-тренировки */
+.split-hr { border: none; border-top: 1px solid var(--border); margin: 26px 0 14px; }
+.mini-title { color: var(--muted); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+.kind-tag {
+  font-size: 11px; font-weight: 700;
+  color: var(--accent); background: var(--card2);
+  border: 1px solid var(--border);
+  padding: 4px 10px; border-radius: 999px;
+}
+
+/* Переключатель «Основные / Мини» в прогрессе */
+.seg { display: flex; gap: 6px; background: var(--card); border: 1px solid var(--border); border-radius: var(--rS); padding: 4px; margin-bottom: 10px; }
+.seg-btn {
+  flex: 1; padding: 9px 0; border: none; border-radius: calc(var(--rS) - 2px);
+  background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.seg-btn.active { background: var(--accent); color: #fff; }
 
 /* Кнопки */
 .btn {

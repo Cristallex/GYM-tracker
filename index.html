@@ -19,17 +19,27 @@
     <section id="screen-workout" class="screen active">
       <div id="workoutIdle" class="idle">
         <p class="idle-emoji">🏋️</p>
-        <p class="idle-text">Готов к тренировке?</p>
         <button id="btnStartWorkout" class="btn btn-primary btn-big">Добавить тренировку</button>
         <button id="btnDiscardWorkout" class="btn btn-text-danger hidden">Отменить тренировку</button>
         <div id="plannedCard"></div>
         <div id="templates"></div>
         <button id="btnPlanWorkout" class="btn btn-outline btn-block">📅 Запланировать тренировку</button>
+
+        <div class="split-hr"></div>
+        <div class="mini-block">
+          <p class="mini-title">⚡ Мини-тренировка</p>
+          <button id="btnStartMini" class="btn btn-primary btn-big">Добавить мини-тренировку</button>
+          <button id="btnDiscardMini" class="btn btn-text-danger hidden">Отменить мини-тренировку</button>
+          <div id="plannedMiniCard"></div>
+          <div id="miniTemplates"></div>
+          <button id="btnPlanMini" class="btn btn-outline btn-block">📅 Запланировать мини-тренировку</button>
+        </div>
       </div>
 
       <div id="workoutActive" class="hidden">
         <div class="active-head">
           <button id="btnBackWorkout" class="btn btn-back">← Назад</button>
+          <span id="kindTag" class="kind-tag hidden">⚡ мини</span>
           <div id="workoutTimer" class="workout-timer hidden">⏱ 0:00:00</div>
         </div>
 
@@ -63,6 +73,10 @@
 
     <!-- ===== ПРОГРЕСС ===== -->
     <section id="screen-progress" class="screen">
+      <div class="seg">
+        <button id="segMain" class="seg-btn active">Основные</button>
+        <button id="segMini" class="seg-btn">⚡ Мини</button>
+      </div>
       <select id="progressSelect" class="select"></select>
       <div id="progressBody"></div>
     </section>
