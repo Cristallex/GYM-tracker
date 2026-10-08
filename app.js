@@ -993,6 +993,35 @@ function renderAdmin() {
     `<tbody>${sRows.join("") || '<tr><td colspan="4">пусто</td></tr>'}</tbody></table>`;
 }
 
+/* --- Проверка обновлений APK через GitHub Releases --- */
+const APP_VERSION = "1.0.0";
+const GH_REPO = "Cristallex/GYM-tracker";
+
+const isNewerVer = (latest, cur) => {
+  const a = latest.split(".").map(Number), b = cur.split(".").map(Number);
+  for (let i = 0; i < 3; i++) { if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0); }
+  return false;
+};
+
+async function checkUpdate() {
+  if (!isNativeApp()) return; // в браузере обновляет service worker
+  try {
+    const r = await fetch(`https://api.github.com/repos/${GH_REPO}/releases/latest`, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return;
+    const rel = await r.json();
+    const latest = (rel.tag_name || "").replace(/[^\d.]/g, "");
+    const apk = (rel.assets || []).find((a) => a.name.endsWith(".apk"));
+    if (latest && apk && isNewerVer(latest, APP_VERSION)) {
+      $("updateCard").innerHTML = `
+        <div class="card hist-card update-card" onclick="window.open('${apk.browser_download_url}','_system')">
+          <div class="top"><span class="hist-date">🆕 Доступна версия ${esc(latest)}</span></div>
+          <div class="hist-ex">Нажми — скачается APK, открой файл и обнови приложение</div>
+        </div>`;
+    }
+  } catch (e) {}
+}
+setTimeout(checkUpdate, 2000);
+
 /* --- PWA --- */
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
