@@ -1,4 +1,4 @@
-const CACHE = "gymtracker-v29";
+const CACHE = "gymtracker-v30";
 const ASSETS = ["./", "./index.html", "./style.css", "./app.js", "./manifest.webmanifest"];
 const TIMEOUT_MS = 4000; // сколько ждём сеть, прежде чем отдать кэш
 

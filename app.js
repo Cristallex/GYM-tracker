@@ -994,7 +994,7 @@ function renderAdmin() {
 }
 
 /* --- Проверка обновлений APK через GitHub Releases --- */
-const APP_VERSION = "1.0.1";
+const APP_VERSION = "1.0.2";
 const GH_REPO = "Cristallex/GYM-tracker";
 
 const isNewerVer = (latest, cur) => {
