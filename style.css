@@ -144,8 +144,8 @@ main { padding: 8px 16px 16px; max-width: 520px; margin: 0 auto; overflow-x: hid
 .idle-text { color: var(--muted); margin-bottom: 24px; font-size: 17px; }
 
 /* Разделение основной и мини-тренировки */
-.split-hr { border: none; border-top: 1px solid var(--border); margin: 26px 0 14px; }
-.mini-title { color: var(--muted); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+.split-hr { border: none; border-top: 1px solid var(--border); margin: 38px 0 16px; }
+.mini-title { color: var(--muted); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
 .kind-tag {
   font-size: 11px; font-weight: 700;
   color: var(--accent); background: var(--card2);
@@ -188,6 +188,7 @@ main { padding: 8px 16px 16px; max-width: 520px; margin: 0 auto; overflow-x: hid
   color: var(--accent);
 }
 .btn-small { padding: 8px 14px; flex-shrink: 0; }
+.btn-slim { font-size: 13px; padding: 8px 14px; margin: 8px 0; }
 .btn-danger { background: transparent; color: var(--red); font-size: 15px; padding: 6px 10px; }
 .btn-back { margin-bottom: 12px; color: var(--muted); }
 .btn-text-danger {
