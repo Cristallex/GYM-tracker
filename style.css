@@ -302,6 +302,18 @@ main { padding: 8px 16px 16px; max-width: 520px; margin: 0 auto; overflow-x: hid
   transition: transform .15s ease;
 }
 
+/* Ручка и «приподнятая» карточка целого упражнения */
+.ex-head-btns { display: flex; align-items: center; gap: 8px; }
+.ex-head-btns .drag-handle { height: 30px; }
+#entries > .card { transition: transform .15s ease; }
+#entries > .card.dragging {
+  position: relative;
+  z-index: 5;
+  transform: scale(1.02);
+  border-color: var(--accent);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .35);
+}
+
 /* Вес тела у подхода */
 .bw-mini {
   width: 28px; height: 34px;

@@ -312,13 +312,16 @@ function renderWorkout() {
   if (document.activeElement !== $("wDate")) $("wDate").value = d.wDate;
 
   $("entries").innerHTML = d.entries.map((e, ei) => `
-    <div class="card">
+    <div class="card" data-ei="${ei}">
       <div class="ex-head">
         <div>
           <span class="ex-name">${esc(e.name)}</span>
           <span class="ex-tag" style="background:${gInfo(e.group).color}22;color:${gInfo(e.group).color}">${esc(e.group || "")}</span>
         </div>
-        <button class="btn-danger btn" onclick="removeEntry(${ei})">✕</button>
+        <div class="ex-head-btns">
+          <button class="drag-handle" onpointerdown="exDragStart(event,${ei})" oncontextmenu="return false" title="Удерживай ~1 сек и перетащи упражнение">☰</button>
+          <button class="btn-danger btn" onclick="removeEntry(${ei})">✕</button>
+        </div>
       </div>
       ${e.sets.map((s, si) => `
         <div class="set-row" data-si="${si}">
@@ -610,6 +613,80 @@ function setDragEnd() {
   }
   dragSet = null;
 }
+
+/* --- Перетаскивание упражнений: та же механика, но для целых карточек --- */
+let dragEx = null;
+
+window.exDragStart = (ev, ei) => {
+  ev.preventDefault();
+  const cardEl = ev.target.closest("#entries > .card");
+  if (!cardEl) return;
+  dragEx = { ei, active: false, rowEl: cardEl, grabDY: 0, ty: 0 };
+  dragEx.timer = setTimeout(() => {
+    if (!dragEx) return;
+    dragEx.active = true;
+    buzz();
+    dragEx.grabDY = ev.clientY - cardEl.getBoundingClientRect().top;
+    cardEl.classList.add("dragging");
+    setTimeout(() => { if (dragEx) dragEx.rowEl.style.transition = "none"; }, 180);
+  }, DRAG_HOLD_MS);
+  window.addEventListener("pointermove", exDragMove);
+  window.addEventListener("pointerup", exDragEnd, { once: true });
+  window.addEventListener("pointercancel", exDragEnd, { once: true });
+};
+
+function exDragMove(ev) {
+  if (!dragEx || !dragEx.active) return;
+  const row = dragEx.rowEl;
+  const list = row.parentElement;
+
+  const layoutTop = row.getBoundingClientRect().top - dragEx.ty;
+  dragEx.ty = ev.clientY - dragEx.grabDY - layoutTop;
+  row.style.transform = `translateY(${dragEx.ty}px) scale(1.02)`;
+
+  const cards = [...list.querySelectorAll(":scope > .card")].filter((r) => r !== row);
+  let insertBeforeEl = null;
+  for (const c of cards) {
+    const rect = c.getBoundingClientRect();
+    if (ev.clientY < rect.top + rect.height / 2) { insertBeforeEl = c; break; }
+  }
+  const needMove = insertBeforeEl ? row.nextElementSibling !== insertBeforeEl : !!row.nextElementSibling;
+  if (!needMove) return;
+
+  const before = new Map(cards.map((r) => [r, r.getBoundingClientRect().top]));
+  list.insertBefore(row, insertBeforeEl);
+  cards.forEach((r) => {
+    const dy = before.get(r) - r.getBoundingClientRect().top;
+    if (!dy) return;
+    r.style.transition = "none";
+    r.style.transform = `translateY(${dy}px)`;
+    requestAnimationFrame(() => {
+      r.style.transition = "transform .15s ease";
+      r.style.transform = "";
+    });
+  });
+
+  const lt = row.getBoundingClientRect().top - dragEx.ty;
+  dragEx.ty = ev.clientY - dragEx.grabDY - lt;
+  row.style.transform = `translateY(${dragEx.ty}px) scale(1.02)`;
+}
+
+function exDragEnd() {
+  window.removeEventListener("pointermove", exDragMove);
+  if (!dragEx) return;
+  clearTimeout(dragEx.timer);
+  const { active, rowEl } = dragEx;
+  if (active) {
+    const entries = curDraft().entries;
+    const order = [...rowEl.parentElement.querySelectorAll(":scope > .card")].map((r) => +r.dataset.ei);
+    const reordered = order.map((i) => entries[i]);
+    entries.length = 0;
+    entries.push(...reordered);
+    save(); renderWorkout();
+  }
+  dragEx = null;
+}
+
 window.removeEntry = (ei) => {
   if (!confirm("Убрать упражнение?")) return;
   curDraft().entries.splice(ei, 1);
@@ -994,7 +1071,7 @@ function renderAdmin() {
 }
 
 /* --- Проверка обновлений APK через GitHub Releases --- */
-const APP_VERSION = "1.0.2";
+const APP_VERSION = "1.0.3";
 const GH_REPO = "Cristallex/GYM-tracker";
 
 const isNewerVer = (latest, cur) => {
